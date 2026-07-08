@@ -1,122 +1,72 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import "./index.css";
 
+import Header from "./components/Header";
+import MobileContextBar from "./components/MobileContextBar";
+import LanguageDropdown from "./components/LanguageDropdown";
+import MainCanvas from "./components/MainCanvas";
+import ActionFooter from "./components/ActionFooter";
+import AmbientGlows from "./components/AmbientGlows";
+import { useTypingEngine } from "./hooks/useTypingEngine";
+
+/**
+ * App — Phase 2 Typing Engine
+ *
+ * Wires the useTypingEngine hook into all layout components.
+ * State flows down as props; no global store needed.
+ */
 function App() {
-  const [count, setCount] = useState(0)
+  const {
+    userInput,
+    errorIndex,
+    wpm,
+    accuracy,
+    isCompleted,
+    focusInput,
+    restart,
+  } = useTypingEngine();
+
+  const SNIPPET_NAME = "Binary Search Algorithm";
+  const LANGUAGE = "Python";
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    // `dark` class is on <html> (set in index.html); body inherits bg gradient from index.css
+    <div className="text-on-surface flex flex-col font-sans overflow-hidden selection:bg-primary/30 selection:text-primary min-h-screen">
+      {/* ── Ambient decorative glows (behind everything) ─────────── */}
+      <AmbientGlows />
 
-      <div className="ticks"></div>
+      {/* ── Top App Bar ─────────────────────────────────────────── */}
+      <Header
+        snippetName={SNIPPET_NAME}
+        wpm={wpm}
+        accuracy={accuracy}
+      />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* ── Main Content Area ───────────────────────────────────── */}
+      <main className="flex-grow flex flex-col items-center justify-center p-4 w-full max-w-5xl mx-auto relative h-full">
+        {/* Mobile context headers — hidden on md+ */}
+        <MobileContextBar
+          language={LANGUAGE}
+          snippetName={SNIPPET_NAME}
+          wpm={wpm}
+          accuracy={accuracy}
+        />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        {/* Language selector — desktop row above canvas */}
+        <LanguageDropdown language={LANGUAGE} />
+
+        {/* Typing canvas */}
+        <MainCanvas
+          userInput={userInput}
+          errorIndex={errorIndex}
+          isCompleted={isCompleted}
+          onFocus={focusInput}
+        />
+      </main>
+
+      {/* ── Floating Action Bar ─────────────────────────────────── */}
+      <ActionFooter onRestart={restart} />
+    </div>
+  );
 }
 
-export default App
+export default App;
