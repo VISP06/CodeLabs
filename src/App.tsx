@@ -1,4 +1,5 @@
 import "./index.css";
+import { useState } from "react";
 
 import Header from "./components/Header";
 import MobileContextBar from "./components/MobileContextBar";
@@ -25,6 +26,9 @@ function App() {
     focusInput,
     restart,
   } = useTypingEngine();
+
+  const [isBlindMode, setIsBlindMode] = useState(false);
+  const toggleBlindMode = () => setIsBlindMode((prev) => !prev);
 
   const SNIPPET_NAME = "Binary Search Algorithm";
   const LANGUAGE = "Python";
@@ -61,12 +65,13 @@ function App() {
           userInput={userInput}
           errorIndex={errorIndex}
           isCompleted={isCompleted}
+          isBlindMode={isBlindMode}
           onFocus={focusInput}
         />
       </main>
 
       {/* ── Floating Action Bar ─────────────────────────────────── */}
-      <ActionFooter onRestart={restart} />
+      <ActionFooter onRestart={restart} isBlindMode={isBlindMode} onToggleBlindMode={toggleBlindMode} />
     </div>
   );
 }

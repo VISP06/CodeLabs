@@ -139,6 +139,13 @@ export function useTypingEngine(): TypingEngineState {
 
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  /**
+   * Number of auto-inserted characters sitting ahead of the cursor.
+   * When the user types a closing bracket/quote out of muscle memory,
+   * we consume one skip token instead of registering the keystroke.
+   */
+  const autoSkipCountRef = useRef(0);
+
   // ── Stats updater ──────────────────────────────────────────────────────────
 
   const updateStats = useCallback(
@@ -165,6 +172,15 @@ export function useTypingEngine(): TypingEngineState {
 
   // ── Keystroke handler ──────────────────────────────────────────────────────
 
+  // ── Bracket / quote pairs ────────────────────────────────────────────────
+  const OPEN_TO_CLOSE: Record<string, string> = {
+    "(": ")",
+    "[": "]",
+    "{": "}",
+    '"': '"',
+    "'": "'",
+  };
+
   const handleKey = useCallback(
     (e: KeyboardEvent) => {
       // Prevent spacebar page scroll while typing
@@ -187,6 +203,8 @@ export function useTypingEngine(): TypingEngineState {
 
       // ── Backspace ──────────────────────────────────────────────────────────
       if (e.key === "Backspace") {
+        // If there are auto-skipped characters ahead, remove them first
+        autoSkipCountRef.current = 0;
         setUserInput((prev) => {
           if (prev.length === 0) return prev;
           const next = prev.slice(0, -1);
@@ -216,34 +234,94 @@ export function useTypingEngine(): TypingEngineState {
 
       if (currentIdx >= targetText.length) return; // Already at end
 
+      // ── Smart closing-bracket skip (muscle-memory guard) ─────────────────
+      // If the user types a closing character and we have auto-inserted chars
+      // sitting ahead, silently consume one skip token and do nothing else.
+      const closingChars = new Set(Object.values(OPEN_TO_CLOSE));
+      if (autoSkipCountRef.current > 0 && closingChars.has(typedChar)) {
+        autoSkipCountRef.current -= 1;
+        e.preventDefault();
+        return;
+      }
+
       // Start timer on first keystroke
       if (!isStarted) {
         startTimeRef.current = Date.now();
         setIsStarted(true);
       }
 
-      // Count this as an attempt
-      totalAttemptsRef.current += 1;
-
       const expectedChar = targetText[currentIdx];
       const isCorrect = typedChar === expectedChar;
 
-      const nextInput = userInput + typedChar;
-      setUserInput(nextInput);
-
       if (isCorrect) {
-        correctCharsRef.current += 1;
-        setErrorIndex(-1);
+        // ── Smart Indentation: Enter auto-advances past leading spaces ────────
+        if (typedChar === "\n") {
+          // Find the start of the next line in targetText
+          const afterNewline = currentIdx + 1;
+          let leadingSpaces = 0;
+          while (
+            afterNewline + leadingSpaces < targetText.length &&
+            targetText[afterNewline + leadingSpaces] === " "
+          ) {
+            leadingSpaces++;
+          }
 
-        // Check completion
-        if (nextInput.length === targetText.length) {
-          setIsCompleted(true);
+          // Build the string to auto-append: \n + however many spaces follow
+          const autoAppend = "\n" + " ".repeat(leadingSpaces);
+          const charsAdded = autoAppend.length; // 1 (Enter) + leadingSpaces
+
+          // Count this as one attempt (the Enter key) — auto-spaces are free
+          totalAttemptsRef.current += 1;
+          correctCharsRef.current += charsAdded;
+
+          const nextInput = userInput + autoAppend;
+          setUserInput(nextInput);
+          setErrorIndex(-1);
+          updateStats(correctCharsRef.current, totalAttemptsRef.current);
+
+          if (nextInput.length === targetText.length) setIsCompleted(true);
+          return;
         }
-      } else {
-        setErrorIndex(currentIdx);
-      }
 
-      updateStats(correctCharsRef.current, totalAttemptsRef.current);
+        // ── Smart Bracket / Quote Auto-close ─────────────────────────────────
+        const closingChar = OPEN_TO_CLOSE[typedChar];
+        if (closingChar !== undefined) {
+          const nextCharInTarget = targetText[currentIdx + 1];
+          if (nextCharInTarget === closingChar) {
+            // Auto-insert both the opening and closing character
+            const autoAppend = typedChar + closingChar;
+            totalAttemptsRef.current += 1;
+            correctCharsRef.current += 2; // both chars are correct
+            autoSkipCountRef.current += 1; // track one ghost closing char
+
+            const nextInput = userInput + autoAppend;
+            setUserInput(nextInput);
+            setErrorIndex(-1);
+            updateStats(correctCharsRef.current, totalAttemptsRef.current);
+
+            if (nextInput.length === targetText.length) setIsCompleted(true);
+            return;
+          }
+        }
+
+        // ── Normal correct keystroke ──────────────────────────────────────────
+        totalAttemptsRef.current += 1;
+        correctCharsRef.current += 1;
+
+        const nextInput = userInput + typedChar;
+        setUserInput(nextInput);
+        setErrorIndex(-1);
+        updateStats(correctCharsRef.current, totalAttemptsRef.current);
+
+        if (nextInput.length === targetText.length) setIsCompleted(true);
+      } else {
+        // ── Incorrect keystroke ───────────────────────────────────────────────
+        totalAttemptsRef.current += 1;
+        const nextInput = userInput + typedChar;
+        setUserInput(nextInput);
+        setErrorIndex(currentIdx);
+        updateStats(correctCharsRef.current, totalAttemptsRef.current);
+      }
     },
     [userInput, errorIndex, isStarted, isCompleted, targetText, updateStats]
   );
@@ -267,6 +345,7 @@ export function useTypingEngine(): TypingEngineState {
     startTimeRef.current = null;
     totalAttemptsRef.current = 0;
     correctCharsRef.current = 0;
+    autoSkipCountRef.current = 0;
     inputRef.current?.focus();
   }, []);
 

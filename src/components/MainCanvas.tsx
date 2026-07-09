@@ -9,6 +9,8 @@ interface MainCanvasProps {
   /** Global flat index of the error; -1 = no error */
   errorIndex: number;
   isCompleted: boolean;
+  /** When true, untyped characters are hidden (opacity-0) */
+  isBlindMode: boolean;
   onFocus: () => void;
 }
 
@@ -40,6 +42,7 @@ export default function MainCanvas({
   userInput,
   errorIndex,
   isCompleted,
+  isBlindMode,
   onFocus,
 }: MainCanvasProps) {
   // Scroll the cursor into view inside the canvas
@@ -86,7 +89,7 @@ export default function MainCanvas({
                       ref={isCurrent ? cursorRef : undefined}
                       className={`
                         relative inline-block 
-                        ${isError ? "text-red-500 bg-red-500/20" : isTyped ? "opacity-100" : "opacity-30"}
+                        ${isError ? "text-red-500 bg-red-500/20" : isTyped ? "opacity-100" : isBlindMode ? "opacity-0" : "opacity-30"}
                         ${isCurrent ? `border-l-2 ${cursorColorClass} animate-blink` : "border-l-2 border-transparent"}
                         ${getCharStyle(currentIndex)}
                       `.trim()}

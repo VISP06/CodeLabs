@@ -1,8 +1,10 @@
 interface ActionFooterProps {
   onRestart: () => void;
+  isBlindMode: boolean;
+  onToggleBlindMode: () => void;
 }
 
-export default function ActionFooter({ onRestart }: ActionFooterProps) {
+export default function ActionFooter({ onRestart, isBlindMode, onToggleBlindMode }: ActionFooterProps) {
   return (
     <nav
       aria-label="Typing actions"
@@ -28,6 +30,21 @@ export default function ActionFooter({ onRestart }: ActionFooterProps) {
             style={{ fontVariationSettings: "'FILL' 1" }}
           >
             volume_up
+          </span>
+        </button>
+
+        {/* Blind Mode Toggle */}
+        <button
+          aria-label={isBlindMode ? "Disable Blind Mode" : "Enable Blind Mode"}
+          onClick={onToggleBlindMode}
+          className={`p-3 rounded-full transition-all ${
+            isBlindMode
+              ? "bg-primary text-on-primary shadow-lg shadow-primary/20 hover:opacity-90"
+              : "text-on-surface-variant hover:text-primary hover:bg-white/10"
+          }`}
+        >
+          <span className="material-symbols-outlined text-2xl">
+            {isBlindMode ? "visibility_off" : "visibility"}
           </span>
         </button>
 
