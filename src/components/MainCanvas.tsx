@@ -1,9 +1,10 @@
 import { useRef, useEffect } from "react";
-import { SNIPPET_LINES, type SnippetLine } from "../hooks/useTypingEngine";
+import { SNIPPET_LINES } from "../hooks/useTypingEngine";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface MainCanvasProps {
+  targetText: string;
   userInput: string;
   /** Global flat index of the error; -1 = no error */
   errorIndex: number;
@@ -11,127 +12,45 @@ interface MainCanvasProps {
   onFocus: () => void;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-// ── Character State ───────────────────────────────────────────────────────────
-
-type CharState = "untyped" | "correct" | "error" | "cursor";
-
-function getCharState(
-  flatIdx: number,
-  userInputLen: number,
-  errorIndex: number
-): CharState {
-  if (flatIdx === userInputLen) return "cursor";
-  if (flatIdx < userInputLen) {
-    if (errorIndex !== -1 && flatIdx >= errorIndex) return "error";
-    return "correct";
-  }
-  return "untyped";
-}
-
-// ── Per-character renderer ────────────────────────────────────────────────────
-
-interface RenderChar {
-  char: string;
-  state: CharState;
-  colorClass: string;
-}
-
-function buildRenderData(
-  lines: SnippetLine[],
-  userInput: string,
-  errorIndex: number
-): RenderChar[][] {
-  const rendered: RenderChar[][] = lines.map(() => []);
-  let flatIdx = 0;
-
-  lines.forEach((line, li) => {
-    line.tokens.forEach((token) => {
-      for (let c = 0; c < token.text.length; c++) {
-        const state = getCharState(flatIdx, userInput.length, errorIndex);
-        rendered[li].push({
-          char: token.text[c],
-          state,
-          colorClass: token.colorClass,
-        });
-        flatIdx++;
+// Helper to precalculate color classes for flat target text character indices
+const getCharStyle = (index: number): string => {
+  let count = 0;
+  for (let li = 0; li < SNIPPET_LINES.length; li++) {
+    const line = SNIPPET_LINES[li];
+    for (let ti = 0; ti < line.tokens.length; ti++) {
+      const token = line.tokens[ti];
+      if (index >= count && index < count + token.text.length) {
+        return token.colorClass;
       }
-    });
-
-    // Skip the "\n" between lines
-    if (li < lines.length - 1) {
-      flatIdx++;
+      count += token.text.length;
     }
-  });
-
-  // If cursor sits exactly at a newline boundary, mark the first char of next
-  // line as cursor — already handled by flatIdx logic above.
-
-  return rendered;
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function CharSpan({ rc, hasError }: { rc: RenderChar; hasError: boolean }) {
-  if (rc.state === "cursor") {
-    // Show the blinking cursor before the next untyped character
-    const cursorClass = hasError
-      ? "bg-error error-cursor shadow-[0_0_8px_rgba(255,107,107,0.8)]"
-      : "bg-primary blinking-cursor shadow-[0_0_8px_rgba(125,211,252,0.8)]";
-    return (
-      <>
-        <span
-          className={`inline-block w-[3px] h-[1.2em] ${cursorClass} align-middle -translate-y-px`}
-          aria-hidden="true"
-        />
-        <span className={`${rc.colorClass} opacity-[0.27]`}>{rc.char}</span>
-      </>
-    );
+    // Newline character
+    if (index === count) {
+      return "";
+    }
+    count += 1; // For the newline character
   }
-
-  if (rc.state === "error") {
-    return (
-      <span className="text-error bg-error/10 rounded-[2px]">{rc.char}</span>
-    );
-  }
-
-  if (rc.state === "correct") {
-    return <span className={rc.colorClass}>{rc.char}</span>;
-  }
-
-  // untyped
-  return (
-    <span className={`${rc.colorClass} opacity-[0.27]`}>{rc.char}</span>
-  );
-}
+  return "";
+};
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function MainCanvas({
+  targetText,
   userInput,
   errorIndex,
   isCompleted,
   onFocus,
 }: MainCanvasProps) {
-  const renderData = buildRenderData(
-    SNIPPET_LINES,
-    userInput,
-    errorIndex
-  );
-
-  // Cursor is at the end of userInput
-  const cursorFlatIdx = userInput.length;
-
-  // Determine which line the cursor is on (for the error cursor indicator)
-  // We track if there's currently a red cursor state
-  const hasError = errorIndex !== -1;
-
   // Scroll the cursor into view inside the canvas
   const cursorRef = useRef<HTMLSpanElement | null>(null);
   useEffect(() => {
     cursorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [cursorFlatIdx]);
+  }, [userInput.length]);
+
+  const lines = targetText.split("\n");
+
+  let globalCharIndex = 0; // Track the absolute index across lines
 
   return (
     <div
@@ -139,75 +58,64 @@ export default function MainCanvas({
       onClick={onFocus}
     >
       <div className="w-full glass rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-y-auto hide-scroll ring-1 ring-white/5">
-        {/* ── Line Numbers ──────────────────────────────────────────────── */}
-        <div
-          aria-hidden="true"
-          className="absolute left-0 top-0 bottom-0 w-12 bg-white/5 border-r border-white/10 flex flex-col items-end py-6 sm:py-8 pr-3 font-mono text-xs sm:text-sm text-outline/40 select-none pointer-events-none"
-        >
-          {SNIPPET_LINES.map((line) => (
-            <span key={line.lineNumber}>{line.lineNumber}</span>
-          ))}
-        </div>
+        <div className="flex flex-row gap-4 font-mono text-[16px]">
+          {/* Left Column (Line Numbers) */}
+          <div className="flex flex-col text-right select-none opacity-40 min-w-[3rem] border-r border-white/10 pr-4 mr-2">
+            {lines.map((_, i) => (
+              <span key={i}>{i + 1}</span>
+            ))}
+          </div>
 
-        {/* ── Code Content ──────────────────────────────────────────────── */}
-        <pre className="pl-12 sm:pl-16 font-mono text-lg sm:text-xl whitespace-pre-wrap break-words w-full h-full">
-          <code className="language-python">
-            {renderData.map((lineChars, li) => {
-              // Check if the cursor sits at the newline *after* this line
-              // (i.e. between this line and next). Flat index of that newline:
-              let lineLen = 0;
-              for (let i = 0; i <= li; i++) {
-                lineLen += SNIPPET_LINES[i].tokens.reduce(
-                  (s, t) => s + t.text.length,
-                  0
-                );
-                if (i < li) lineLen += 1; // count preceding newlines
-              }
-              const newlineFlatIdx = lineLen; // index of "\n" after this line
+          {/* Right Column (Code Text) */}
+          <div className="flex flex-col relative">
+            {/* Map over lines first */}
+            {lines.map((line, lineIndex) => (
+              <div key={lineIndex} className="flex flex-row whitespace-pre">
+                {/* Map over characters in this specific line */}
+                {line.split("").map((char) => {
+                  const currentIndex = globalCharIndex++;
+                  const isTyped = currentIndex < userInput.length;
+                  const isCurrent = currentIndex === userInput.length;
+                  const isError = isTyped && userInput[currentIndex] !== char;
 
-              // Does the cursor sit at this newline position?
-              const cursorOnNewline =
-                !isCompleted &&
-                userInput.length === newlineFlatIdx &&
-                li < SNIPPET_LINES.length - 1;
+                  const cursorColorClass = errorIndex !== -1 ? "border-red-500" : "border-[#7ae2ff]";
 
-              return (
-                <span key={SNIPPET_LINES[li].lineNumber}>
-                  {lineChars.map((rc, ci) => {
-                    const isCursorHere =
-                      !isCompleted &&
-                      rc.state === "cursor";
-
-                    return (
-                      <span
-                        key={ci}
-                        ref={isCursorHere ? cursorRef : null}
-                      >
-                        <CharSpan rc={rc} hasError={hasError} />
-                      </span>
-                    );
-                  })}
-
-                  {/* Cursor sitting at end-of-line (before \n) */}
-                  {cursorOnNewline && (
+                  return (
                     <span
-                      ref={cursorRef}
-                      className={`inline-block w-[3px] h-[1.2em] align-middle -translate-y-px blinking-cursor shadow-[0_0_8px_rgba(125,211,252,0.8)] ${
-                        hasError
-                          ? "bg-error shadow-[0_0_8px_rgba(255,107,107,0.8)]"
-                          : "bg-primary"
-                      }`}
-                      aria-hidden="true"
-                    />
-                  )}
+                      key={currentIndex}
+                      ref={isCurrent ? cursorRef : undefined}
+                      className={`
+                        relative inline-block 
+                        ${isError ? "text-red-500 bg-red-500/20" : isTyped ? "opacity-100" : "opacity-30"}
+                        ${isCurrent ? `border-l-2 ${cursorColorClass} animate-blink` : "border-l-2 border-transparent"}
+                        ${getCharStyle(currentIndex)}
+                      `.trim()}
+                    >
+                      {char}
+                    </span>
+                  );
+                })}
+                {/* Handle the hidden newline character index at the end of each line */}
+                {(() => {
+                  const isCurrentNewline = globalCharIndex === userInput.length;
+                  globalCharIndex++; // Increment for the \n character
+                  const newlineCursorColorClass = errorIndex !== -1 ? "border-red-500" : "border-[#7ae2ff]";
 
-                  {/* Newline */}
-                  {"\n"}
-                </span>
-              );
-            })}
-          </code>
-        </pre>
+                  return (
+                    <span
+                      ref={isCurrentNewline ? cursorRef : undefined}
+                      className={`inline-block w-2 ${
+                        isCurrentNewline ? `border-l-2 ${newlineCursorColorClass} animate-blink` : ""
+                      }`}
+                    >
+                      &nbsp;
+                    </span>
+                  );
+                })()}
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Completion overlay */}
         {isCompleted && (

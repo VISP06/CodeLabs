@@ -8,7 +8,7 @@ export default function ActionFooter({ onRestart }: ActionFooterProps) {
       aria-label="Typing actions"
       className="fixed bottom-8 left-0 right-0 z-50 flex justify-center items-center"
     >
-      <div className="glass rounded-full px-4 py-2 flex items-center gap-3 shadow-2xl border border-white/10">
+      <div className="glass rounded-full px-4 py-2 flex items-center gap-4 shadow-2xl border border-white/10">
         {/* Restart */}
         <button
           aria-label="Restart"
@@ -17,9 +17,6 @@ export default function ActionFooter({ onRestart }: ActionFooterProps) {
         >
           <span className="material-symbols-outlined text-2xl">refresh</span>
         </button>
-
-        {/* Divider */}
-        <div aria-hidden="true" className="w-px h-6 bg-white/10 mx-1" />
 
         {/* Sound (active state — filled icon, primary bg) */}
         <button

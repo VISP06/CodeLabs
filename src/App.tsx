@@ -16,6 +16,7 @@ import { useTypingEngine } from "./hooks/useTypingEngine";
  */
 function App() {
   const {
+    targetText,
     userInput,
     errorIndex,
     wpm,
@@ -56,6 +57,7 @@ function App() {
 
         {/* Typing canvas */}
         <MainCanvas
+          targetText={targetText}
           userInput={userInput}
           errorIndex={errorIndex}
           isCompleted={isCompleted}
