@@ -21,6 +21,12 @@ interface MainCanvasProps {
   wpm: number;
   /** Current accuracy — used when saving to the leaderboard */
   accuracy: number;
+  /** Elapsed seconds from first keystroke to completion */
+  timeTaken: number;
+  /** Canonical snippet title used as the DB key (e.g. "Binary Search") */
+  snippetTitle: string;
+  /** Programming language label stored alongside the record */
+  snippetLanguage: string;
   /** Callback to tell App to increment the guest completion counter */
   onGuestComplete: () => void;
   /** Controls paywall modal visibility (lifted to App) */
@@ -176,6 +182,9 @@ export default function MainCanvas({
   session,
   wpm,
   accuracy,
+  timeTaken,
+  snippetTitle,
+  snippetLanguage,
   onGuestComplete,
   showPaywall,
   onClosePaywall,
@@ -202,21 +211,58 @@ export default function MainCanvas({
     if (!isCompleted || prevCompleted.current) return;
 
     if (session) {
-      // ── Authenticated: save stats to cloud (exactly once per run) ──
+      // ── Authenticated: smart high-score save (exactly once per run) ──
       if (!statSaved.current) {
         statSaved.current = true;
-        supabase
-          .from("typing_stats")
-          .insert({
-            user_id: session.user.id,
-            snippet_name: "Binary Search",
-            language: "Python",
-            wpm,
-            accuracy,
-          })
-          .then(({ error }) => {
-            if (error) console.error("[CodeLabs] Failed to save stats:", error.message);
-          });
+
+        // Extract username: everything before the '@' in the user's email
+        const username = (session.user.email ?? "").split("@")[0] || "anonymous";
+
+        (async () => {
+          // 1. Check if a record already exists for this user + snippet
+          const { data: existing, error: fetchErr } = await supabase
+            .from("typing_stats")
+            .select("id, wpm, accuracy")
+            .eq("user_id", session.user.id)
+            .eq("snippet_name", snippetTitle)
+            .maybeSingle();
+
+          if (fetchErr) {
+            console.error("[CodeLabs] Failed to check existing record:", fetchErr.message);
+            return;
+          }
+
+          if (!existing) {
+            // 2a. No record yet — insert fresh
+            const { error: insertErr } = await supabase
+              .from("typing_stats")
+              .insert({
+                user_id: session.user.id,
+                username,
+                snippet_name: snippetTitle,
+                language: snippetLanguage,
+                wpm,
+                accuracy,
+                time_taken: timeTaken,
+              });
+            if (insertErr)
+              console.error("[CodeLabs] Insert failed:", insertErr.message);
+          } else if (wpm > existing.wpm && accuracy >= existing.accuracy) {
+            // 2b. Existing record — only overwrite if this run is strictly better
+            const { error: updateErr } = await supabase
+              .from("typing_stats")
+              .update({
+                username,
+                wpm,
+                accuracy,
+                time_taken: timeTaken,
+              })
+              .eq("id", existing.id);
+            if (updateErr)
+              console.error("[CodeLabs] Update failed:", updateErr.message);
+          }
+          // else: existing record is already better — do nothing
+        })();
       }
     } else {
       // ── Guest: increment paywall counter ───────────────────────────
@@ -224,7 +270,7 @@ export default function MainCanvas({
     }
 
     prevCompleted.current = isCompleted;
-  }, [isCompleted, session, wpm, accuracy, onGuestComplete]);
+  }, [isCompleted, session, wpm, accuracy, timeTaken, onGuestComplete]);
 
   // Keep prevCompleted in sync when isCompleted resets to false
   useEffect(() => {

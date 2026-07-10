@@ -84,6 +84,7 @@ function App() {
     errorIndex,
     wpm,
     accuracy,
+    timeTaken,
     isCompleted,
     focusInput,
     restart,
@@ -92,7 +93,8 @@ function App() {
   const [isBlindMode, setIsBlindMode] = useState(false);
   const toggleBlindMode = () => setIsBlindMode((prev) => !prev);
 
-  const SNIPPET_NAME = "Binary Search Algorithm";
+  // Canonical snippet descriptor — used in the UI and as the DB key
+  const SNIPPET_NAME = "Binary Search";
   const LANGUAGE = "Python";
 
   // ── Loading splash (flicker prevention) ──────────────────────────────
@@ -146,6 +148,9 @@ function App() {
           session={session}
           wpm={wpm}
           accuracy={accuracy}
+          timeTaken={timeTaken}
+          snippetTitle={SNIPPET_NAME}
+          snippetLanguage={LANGUAGE}
           onGuestComplete={handleGuestComplete}
           showPaywall={showPaywall}
           onClosePaywall={() => setShowPaywall(false)}

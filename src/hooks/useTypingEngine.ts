@@ -106,6 +106,8 @@ export interface TypingEngineState {
   wpm: number;
   /** Accuracy percentage, 0-100 */
   accuracy: number;
+  /** Elapsed time in seconds from first keystroke to completion (0 while running) */
+  timeTaken: number;
   /** Whether the user has started typing */
   isStarted: boolean;
   /** Whether the snippet is fully completed */
@@ -127,6 +129,8 @@ export function useTypingEngine(): TypingEngineState {
   const [errorIndex, setErrorIndex] = useState(-1);
   const [wpm, setWpm] = useState(0);
   const [accuracy, setAccuracy] = useState(100);
+  /** Seconds elapsed from first keystroke to completion; 0 while still running */
+  const [timeTaken, setTimeTaken] = useState(0);
   const [isStarted, setIsStarted] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -285,7 +289,13 @@ export function useTypingEngine(): TypingEngineState {
           setErrorIndex(-1);
           updateStats(correctCharsRef.current, totalAttemptsRef.current);
 
-          if (nextInput.length === targetText.length) setIsCompleted(true);
+          if (nextInput.length === targetText.length) {
+            setIsCompleted(true);
+            if (startTimeRef.current) {
+              const elapsedSec = (Date.now() - startTimeRef.current) / 1000;
+              setTimeTaken(Math.round(elapsedSec * 10) / 10);
+            }
+          }
           return;
         }
 
@@ -309,7 +319,14 @@ export function useTypingEngine(): TypingEngineState {
             setErrorIndex(-1);
             updateStats(correctCharsRef.current, totalAttemptsRef.current);
 
-            if (nextInput.length === targetText.length) setIsCompleted(true);
+            if (nextInput.length === targetText.length) {
+              setIsCompleted(true);
+              // Capture elapsed time once at the moment the snippet is completed
+              if (startTimeRef.current) {
+                const elapsedSec = (Date.now() - startTimeRef.current) / 1000;
+                setTimeTaken(Math.round(elapsedSec * 10) / 10);
+              }
+            }
             return;
           }
         }
@@ -323,7 +340,14 @@ export function useTypingEngine(): TypingEngineState {
         setErrorIndex(-1);
         updateStats(correctCharsRef.current, totalAttemptsRef.current);
 
-        if (nextInput.length === targetText.length) setIsCompleted(true);
+        if (nextInput.length === targetText.length) {
+          setIsCompleted(true);
+          // Capture elapsed time once at the moment the snippet is completed
+          if (startTimeRef.current) {
+            const elapsedSec = (Date.now() - startTimeRef.current) / 1000;
+            setTimeTaken(Math.round(elapsedSec * 10) / 10);
+          }
+        }
       } else {
         // ── Incorrect keystroke ───────────────────────────────────────────────
         totalAttemptsRef.current += 1;
@@ -350,6 +374,7 @@ export function useTypingEngine(): TypingEngineState {
     setErrorIndex(-1);
     setWpm(0);
     setAccuracy(100);
+    setTimeTaken(0);
     setIsStarted(false);
     setIsCompleted(false);
     startTimeRef.current = null;
@@ -371,6 +396,7 @@ export function useTypingEngine(): TypingEngineState {
     errorIndex,
     wpm,
     accuracy,
+    timeTaken,
     isStarted,
     isCompleted,
     inputRef,
