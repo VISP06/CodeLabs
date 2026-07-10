@@ -1,9 +1,8 @@
 import "./index.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Session } from "@supabase/supabase-js";
 
 import { supabase } from "./lib/supabase";
-import Auth from "./components/Auth";
 import Header from "./components/Header";
 import MobileContextBar from "./components/MobileContextBar";
 import LanguageDropdown from "./components/LanguageDropdown";
@@ -12,29 +11,30 @@ import ActionFooter from "./components/ActionFooter";
 import AmbientGlows from "./components/AmbientGlows";
 import { useTypingEngine } from "./hooks/useTypingEngine";
 
+// ─── How many snippets a guest can complete before the paywall fires ───────────
+const GUEST_FREE_COMPLETIONS = 3;
+
 /**
- * App — Phase 4: Backend Integration
+ * App — Phase 5: Session Management & Soft Paywall
  *
- * Listens to Supabase auth state:
- *   - No session → renders <Auth /> (login / sign-up screen)
- *   - Active session → renders the main CodeLabs typing application
- *
- * Session is populated via getSession() on mount and kept in sync
- * via onAuthStateChange, so hot-reloads and tab switches are handled.
+ * Routing logic:
+ *   - Everyone lands on the main CodeLabs editor (Guest Mode).
+ *   - Authenticated users see a lettered avatar in the Header with a Sign Out
+ *     dropdown.
+ *   - After GUEST_FREE_COMPLETIONS snippet completions without an account, the
+ *     soft-paywall modal (embedded inside MainCanvas) is triggered.
  */
 function App() {
-  // ── Auth state ────────────────────────────────────────────────────
+  // ── Auth state ────────────────────────────────────────────────────────
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    // Populate session immediately from local storage / cookie
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
     });
 
-    // Keep session in sync across tabs and after sign-in / sign-out
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -45,7 +45,29 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Typing engine (only used when authenticated) ──────────────────
+  // ── Guest completion counter ──────────────────────────────────────────
+  const [guestSnippetsCompleted, setGuestSnippetsCompleted] = useState(0);
+  const [showPaywall, setShowPaywall] = useState(false);
+
+  const handleGuestComplete = useCallback(() => {
+    setGuestSnippetsCompleted((prev) => {
+      const next = prev + 1;
+      if (next >= GUEST_FREE_COMPLETIONS) {
+        setShowPaywall(true);
+      }
+      return next;
+    });
+  }, []);
+
+  // Reset counter when the user logs in
+  useEffect(() => {
+    if (session) {
+      setGuestSnippetsCompleted(0);
+      setShowPaywall(false);
+    }
+  }, [session]);
+
+  // ── Typing engine ─────────────────────────────────────────────────────
   const {
     targetText,
     userInput,
@@ -63,7 +85,7 @@ function App() {
   const SNIPPET_NAME = "Binary Search Algorithm";
   const LANGUAGE = "Python";
 
-  // ── Loading splash (brief flicker prevention) ─────────────────────
+  // ── Loading splash (flicker prevention) ──────────────────────────────
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -75,26 +97,21 @@ function App() {
     );
   }
 
-  // ── Unauthenticated → Auth screen ─────────────────────────────────
-  if (!session) {
-    return <Auth />;
-  }
-
-  // ── Authenticated → Main application ─────────────────────────────
+  // ── Main application (guests + authenticated users) ───────────────────
   return (
-    // `dark` class is on <html> (set in index.html); body inherits bg gradient from index.css
     <div className="text-on-surface flex flex-col font-sans overflow-hidden selection:bg-primary/30 selection:text-primary min-h-screen">
-      {/* ── Ambient decorative glows (behind everything) ─────────── */}
+      {/* ── Ambient decorative glows ──────────────────────────────────── */}
       <AmbientGlows />
 
-      {/* ── Top App Bar ─────────────────────────────────────────── */}
+      {/* ── Top App Bar ───────────────────────────────────────────────── */}
       <Header
         snippetName={SNIPPET_NAME}
         wpm={wpm}
         accuracy={accuracy}
+        session={session}
       />
 
-      {/* ── Main Content Area ───────────────────────────────────── */}
+      {/* ── Main Content Area ─────────────────────────────────────────── */}
       <main className="flex-grow flex flex-col items-center justify-center p-4 w-full max-w-5xl mx-auto relative h-full">
         {/* Mobile context headers — hidden on md+ */}
         <MobileContextBar
@@ -107,7 +124,7 @@ function App() {
         {/* Language selector — desktop row above canvas */}
         <LanguageDropdown language={LANGUAGE} />
 
-        {/* Typing canvas */}
+        {/* Typing canvas — passes session and paywall controls down */}
         <MainCanvas
           targetText={targetText}
           userInput={userInput}
@@ -115,10 +132,14 @@ function App() {
           isCompleted={isCompleted}
           isBlindMode={isBlindMode}
           onFocus={focusInput}
+          session={session}
+          onGuestComplete={handleGuestComplete}
+          showPaywall={showPaywall}
+          onClosePaywall={() => setShowPaywall(false)}
         />
       </main>
 
-      {/* ── Floating Action Bar ─────────────────────────────────── */}
+      {/* ── Floating Action Bar ───────────────────────────────────────── */}
       <ActionFooter
         onRestart={restart}
         isBlindMode={isBlindMode}

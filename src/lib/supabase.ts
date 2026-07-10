@@ -10,4 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+console.log("RAW URL: ->" + supabaseUrl + "<-");
+console.log("RAW KEY: ->" + supabaseAnonKey + "<-");
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
