@@ -2,9 +2,10 @@ interface ActionFooterProps {
   onRestart: () => void;
   isBlindMode: boolean;
   onToggleBlindMode: () => void;
+  onOpenLeaderboard: () => void;
 }
 
-export default function ActionFooter({ onRestart, isBlindMode, onToggleBlindMode }: ActionFooterProps) {
+export default function ActionFooter({ onRestart, isBlindMode, onToggleBlindMode, onOpenLeaderboard }: ActionFooterProps) {
   return (
     <nav
       aria-label="Typing actions"
@@ -30,6 +31,30 @@ export default function ActionFooter({ onRestart, isBlindMode, onToggleBlindMode
             style={{ fontVariationSettings: "'FILL' 1" }}
           >
             volume_up
+          </span>
+        </button>
+
+        {/* Leaderboard */}
+        <button
+          id="action-leaderboard-btn"
+          aria-label="Open leaderboard"
+          onClick={onOpenLeaderboard}
+          className="p-3 rounded-full transition-all"
+          style={{ color: "#fbbf24" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(251,191,36,0.12)";
+            e.currentTarget.style.transform = "scale(1.08)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          <span
+            className="material-symbols-outlined text-2xl"
+            style={{ fontVariationSettings: "'FILL' 1" }}
+          >
+            emoji_events
           </span>
         </button>
 

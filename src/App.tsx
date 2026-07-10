@@ -9,6 +9,8 @@ import LanguageDropdown from "./components/LanguageDropdown";
 import MainCanvas from "./components/MainCanvas";
 import ActionFooter from "./components/ActionFooter";
 import AmbientGlows from "./components/AmbientGlows";
+import Auth from "./components/Auth";
+import Leaderboard from "./components/Leaderboard";
 import { useTypingEngine } from "./hooks/useTypingEngine";
 
 // ─── How many snippets a guest can complete before the paywall fires ───────────
@@ -45,6 +47,12 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // ── Auth modal visibility ─────────────────────────────────────────────
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // ── Leaderboard panel visibility ───────────────────────────────────
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+
   // ── Guest completion counter ──────────────────────────────────────────
   const [guestSnippetsCompleted, setGuestSnippetsCompleted] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
@@ -54,16 +62,18 @@ function App() {
       const next = prev + 1;
       if (next >= GUEST_FREE_COMPLETIONS) {
         setShowPaywall(true);
+        setIsAuthModalOpen(true);
       }
       return next;
     });
   }, []);
 
-  // Reset counter when the user logs in
+  // Reset counter + close auth modal when the user logs in
   useEffect(() => {
     if (session) {
       setGuestSnippetsCompleted(0);
       setShowPaywall(false);
+      setIsAuthModalOpen(false);
     }
   }, [session]);
 
@@ -109,6 +119,7 @@ function App() {
         wpm={wpm}
         accuracy={accuracy}
         session={session}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />
 
       {/* ── Main Content Area ─────────────────────────────────────────── */}
@@ -124,7 +135,7 @@ function App() {
         {/* Language selector — desktop row above canvas */}
         <LanguageDropdown language={LANGUAGE} />
 
-        {/* Typing canvas — passes session and paywall controls down */}
+        {/* Typing canvas — passes session, stats, and paywall controls down */}
         <MainCanvas
           targetText={targetText}
           userInput={userInput}
@@ -133,6 +144,8 @@ function App() {
           isBlindMode={isBlindMode}
           onFocus={focusInput}
           session={session}
+          wpm={wpm}
+          accuracy={accuracy}
           onGuestComplete={handleGuestComplete}
           showPaywall={showPaywall}
           onClosePaywall={() => setShowPaywall(false)}
@@ -144,7 +157,50 @@ function App() {
         onRestart={restart}
         isBlindMode={isBlindMode}
         onToggleBlindMode={toggleBlindMode}
+        onOpenLeaderboard={() => setIsLeaderboardOpen(true)}
       />
+
+      {/* ── Leaderboard Modal ───────────────────────────────────────── */}
+      {isLeaderboardOpen && (
+        <Leaderboard onClose={() => setIsLeaderboardOpen(false)} />
+      )}
+
+      {/* ── Auth Modal Overlay (login / sign-up) ──────────────────────── */}
+      {isAuthModalOpen && !session && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center px-4"
+          style={{
+            background: "rgba(5,8,18,0.80)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            animation: "authOverlayIn 0.2s ease both",
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Authentication"
+        >
+          {/* Close button — lets users dismiss and return to canvas */}
+          <button
+            id="auth-modal-close-btn"
+            aria-label="Close login"
+            onClick={() => setIsAuthModalOpen(false)}
+            className="absolute top-4 right-4 flex items-center justify-center w-9 h-9 rounded-full transition-colors duration-150 focus:outline-none"
+            style={{ color: "#a0b4c4", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.12)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>close</span>
+          </button>
+          <Auth />
+        </div>
+      )}
+
+      <style>{`
+        @keyframes authOverlayIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

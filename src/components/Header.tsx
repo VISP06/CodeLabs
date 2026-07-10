@@ -9,6 +9,8 @@ interface HeaderProps {
   wpm?: number;
   accuracy?: number;
   session: Session | null;
+  /** Opens the auth modal from App — used by Log In button and Sign Out */
+  onOpenAuthModal: () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -18,6 +20,7 @@ export default function Header({
   wpm = 0,
   accuracy = 100,
   session,
+  onOpenAuthModal,
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -41,7 +44,8 @@ export default function Header({
   const handleSignOut = async () => {
     setDropdownOpen(false);
     await supabase.auth.signOut();
-    // App.tsx's onAuthStateChange listener will clear the session and re-render
+    // Re-open auth modal so the user lands back on the login screen
+    onOpenAuthModal();
   };
 
   return (
@@ -96,12 +100,29 @@ export default function Header({
               {avatarLetter}
             </button>
           ) : (
-            /* ── Guest: generic icon, no dropdown ─────────────────────── */
+            /* ── Guest: "Log In" button ─────────────────────────────── */
             <button
-              aria-label="Profile"
-              className="flex items-center justify-center p-2 rounded-full hover:bg-white/10 transition-all text-primary"
+              id="header-login-btn"
+              aria-label="Log in to CodeLabs"
+              onClick={onOpenAuthModal}
+              className="flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              style={{
+                background: "linear-gradient(135deg, rgba(125,211,252,0.18), rgba(200,160,240,0.14))",
+                border: "1px solid rgba(125,211,252,0.35)",
+                color: "#7dd3fc",
+                boxShadow: "0 0 14px rgba(125,211,252,0.12)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "linear-gradient(135deg, rgba(125,211,252,0.28), rgba(200,160,240,0.22))";
+                e.currentTarget.style.boxShadow = "0 0 22px rgba(125,211,252,0.22)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "linear-gradient(135deg, rgba(125,211,252,0.18), rgba(200,160,240,0.14))";
+                e.currentTarget.style.boxShadow = "0 0 14px rgba(125,211,252,0.12)";
+              }}
             >
-              <span className="material-symbols-outlined text-2xl">account_circle</span>
+              <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>login</span>
+              Log In
             </button>
           )}
 

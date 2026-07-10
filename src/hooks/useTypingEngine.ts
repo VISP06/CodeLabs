@@ -154,15 +154,19 @@ export function useTypingEngine(): TypingEngineState {
       const elapsedMs = startTimeRef.current ? now - startTimeRef.current : 0;
       const elapsedMinutes = elapsedMs / 60_000;
 
-      const newWpm =
-        elapsedMinutes > 0
-          ? Math.round(correctCount / 5 / elapsedMinutes)
+      // Standard WPM: (correct chars / 5) / elapsed minutes
+      // Guard against division-by-zero / Infinity / NaN on the very first ms
+      const rawWpm =
+        elapsedMinutes > 0 && correctCount > 0
+          ? correctCount / 5 / elapsedMinutes
           : 0;
+      const newWpm = Math.round(rawWpm);
 
-      const newAccuracy =
-        totalAttempts > 0
-          ? Math.round((correctCount / totalAttempts) * 100)
-          : 100;
+      // Accuracy: ratio of correct keystrokes to total keystrokes attempted.
+      // Clamp strictly to [0, 100] — auto-inserts must never push this above 100.
+      const rawAccuracy =
+        totalAttempts > 0 ? (correctCount / totalAttempts) * 100 : 100;
+      const newAccuracy = Math.min(100, Math.max(0, Math.round(rawAccuracy)));
 
       setWpm(newWpm);
       setAccuracy(newAccuracy);
@@ -268,11 +272,13 @@ export function useTypingEngine(): TypingEngineState {
 
           // Build the string to auto-append: \n + however many spaces follow
           const autoAppend = "\n" + " ".repeat(leadingSpaces);
-          const charsAdded = autoAppend.length; // 1 (Enter) + leadingSpaces
 
-          // Count this as one attempt (the Enter key) — auto-spaces are free
+          // ACCURACY FIX: Count only the Enter keystroke the user physically
+          // pressed (1 attempt, 1 correct). The auto-inserted spaces are free
+          // gifts — including them in the numerator while keeping the
+          // denominator at 1 would push accuracy above 100%.
           totalAttemptsRef.current += 1;
-          correctCharsRef.current += charsAdded;
+          correctCharsRef.current += 1;
 
           const nextInput = userInput + autoAppend;
           setUserInput(nextInput);
@@ -290,8 +296,12 @@ export function useTypingEngine(): TypingEngineState {
           if (nextCharInTarget === closingChar) {
             // Auto-insert both the opening and closing character
             const autoAppend = typedChar + closingChar;
+
+            // ACCURACY FIX: Count only the opening bracket the user physically
+            // typed (1 attempt, 1 correct). The ghost closing char is free —
+            // crediting 2 corrects for 1 attempt pushes accuracy above 100%.
             totalAttemptsRef.current += 1;
-            correctCharsRef.current += 2; // both chars are correct
+            correctCharsRef.current += 1;
             autoSkipCountRef.current += 1; // track one ghost closing char
 
             const nextInput = userInput + autoAppend;

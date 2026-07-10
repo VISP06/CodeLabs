@@ -1,5 +1,6 @@
 import { useRef, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
 import { SNIPPET_LINES } from "../hooks/useTypingEngine";
 import Auth from "./Auth";
 
@@ -16,6 +17,10 @@ interface MainCanvasProps {
   onFocus: () => void;
   /** Active Supabase session — null for guests */
   session: Session | null;
+  /** Current WPM — used when saving to the leaderboard */
+  wpm: number;
+  /** Current accuracy — used when saving to the leaderboard */
+  accuracy: number;
   /** Callback to tell App to increment the guest completion counter */
   onGuestComplete: () => void;
   /** Controls paywall modal visibility (lifted to App) */
@@ -169,25 +174,62 @@ export default function MainCanvas({
   isBlindMode,
   onFocus,
   session,
+  wpm,
+  accuracy,
   onGuestComplete,
   showPaywall,
   onClosePaywall,
 }: MainCanvasProps) {
   const cursorRef = useRef<HTMLSpanElement | null>(null);
   const prevCompleted = useRef(false);
+  /** Guards the Supabase insert so it fires at most once per completed run */
+  const statSaved = useRef(false);
 
   // Scroll the active cursor character into view
   useEffect(() => {
     cursorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [userInput.length]);
 
-  // Detect rising edge of isCompleted → notify App of a guest completion
+  // Reset the save-guard whenever a new run starts (isCompleted goes false again)
   useEffect(() => {
-    if (isCompleted && !prevCompleted.current && !session) {
+    if (!isCompleted) {
+      statSaved.current = false;
+    }
+  }, [isCompleted]);
+
+  // Detect rising edge of isCompleted
+  useEffect(() => {
+    if (!isCompleted || prevCompleted.current) return;
+
+    if (session) {
+      // ── Authenticated: save stats to cloud (exactly once per run) ──
+      if (!statSaved.current) {
+        statSaved.current = true;
+        supabase
+          .from("typing_stats")
+          .insert({
+            user_id: session.user.id,
+            snippet_name: "Binary Search",
+            language: "Python",
+            wpm,
+            accuracy,
+          })
+          .then(({ error }) => {
+            if (error) console.error("[CodeLabs] Failed to save stats:", error.message);
+          });
+      }
+    } else {
+      // ── Guest: increment paywall counter ───────────────────────────
       onGuestComplete();
     }
+
     prevCompleted.current = isCompleted;
-  }, [isCompleted, session, onGuestComplete]);
+  }, [isCompleted, session, wpm, accuracy, onGuestComplete]);
+
+  // Keep prevCompleted in sync when isCompleted resets to false
+  useEffect(() => {
+    if (!isCompleted) prevCompleted.current = false;
+  }, [isCompleted]);
 
   const lines = targetText.split("\n");
   let globalCharIndex = 0;
