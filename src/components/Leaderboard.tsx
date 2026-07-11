@@ -382,7 +382,8 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
 
           {/* Filter Pill UI */}
           {activeSnippet && (
-            <div className="mt-3 flex items-center" style={{ animation: "fadeSlideIn 0.2s ease-out both" }}>
+            <div className="mt-3 flex items-center gap-2" style={{ animation: "fadeSlideIn 0.2s ease-out both" }}>
+              <span className="text-sm font-medium" style={{ color: "#8a9eb0" }}>Filter:</span>
               <button
                 onClick={() => setActiveSnippet(null)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 focus:outline-none"
@@ -401,7 +402,7 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
                   e.currentTarget.style.boxShadow = "0 0 14px rgba(125,211,252,0.1)";
                 }}
               >
-                <span>Filter: {activeSnippet}</span>
+                <span>{activeSnippet}</span>
                 <X size={14} className="opacity-80" />
               </button>
             </div>
