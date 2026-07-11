@@ -211,6 +211,7 @@ export default function Auth() {
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [confirm,  setConfirm]  = useState("");
+  const [username, setUsername] = useState("");
 
   // Visibility toggles
   const [showPassword, setShowPassword] = useState(false);
@@ -240,7 +241,7 @@ export default function Auth() {
   /** Wipes all state when the user switches tabs. */
   const switchMode = (next: AuthMode) => {
     setMode(next);
-    setEmail(""); setPassword(""); setConfirm("");
+    setEmail(""); setPassword(""); setConfirm(""); setUsername("");
     setShowPassword(false); setShowConfirm(false);
     setFieldErrors({ email: "", password: "", confirm: "" });
     setSubmitError(""); setSuccessMessage("");
@@ -269,7 +270,7 @@ export default function Auth() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({ email, password, options: { data: { username } } });
         if (error) throw error;
         setSuccessMessage(
           "Account created! Check your email to confirm your address."
@@ -322,7 +323,7 @@ export default function Auth() {
         style={{ animation: "fadeSlideIn 0.4s ease-out both" }}
       >
         {/* Logo / Brand */}
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-5">
           <div
             className="flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
             style={{
@@ -345,7 +346,7 @@ export default function Auth() {
 
         {/* Glass card — overflow:hidden clips the animated confirm field */}
         <div
-          className="glass rounded-3xl p-8 overflow-hidden"
+          className="glass rounded-3xl p-6 overflow-hidden"
           style={{
             boxShadow: "0 8px 60px rgba(0,0,0,0.5)",
             // Smooth height transition as the confirm field slides in/out
@@ -353,7 +354,7 @@ export default function Auth() {
           }}
         >
           {/* Mode toggle tabs */}
-          <div className="flex rounded-xl p-1 mb-7" style={{ background: "rgba(10,14,26,0.6)" }}>
+          <div className="flex rounded-xl p-1 mb-5" style={{ background: "rgba(10,14,26,0.6)" }}>
             {(["login", "signup"] as AuthMode[]).map((m) => (
               <button
                 key={m}
@@ -378,6 +379,20 @@ export default function Auth() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
+
+            {/* ── Username (Signup Only) ──────────────────────────────── */}
+            {mode === "signup" && (
+              <FieldWrap
+                id="auth-username"
+                label="Username"
+                icon="person"
+                type="text"
+                value={username}
+                placeholder="coolcoder99"
+                autoComplete="username"
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            )}
 
             {/* ── Email ───────────────────────────────────────────────── */}
             <FieldWrap

@@ -41,7 +41,7 @@ export const SNIPPET_LINES: SnippetLine[] = [
   },
   {
     lineNumber: 4,
-    tokens: [{ text: "        mid = int((left + right)/2)", colorClass: "text-on-surface" }],
+    tokens: [{ text: "        mid = (left + right) // 2", colorClass: "text-on-surface" }],
   },
   {
     lineNumber: 5,

@@ -18,6 +18,14 @@ function AuthModal({ onClose }: { onClose: () => void }) {
     if (e.target === e.currentTarget) onClose();
   };
 
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center px-4"
@@ -32,7 +40,7 @@ function AuthModal({ onClose }: { onClose: () => void }) {
       aria-label="Authentication"
     >
       <div
-        className="relative w-full max-w-md overflow-y-auto rounded-3xl"
+        className="relative w-full max-w-md overflow-y-auto rounded-3xl [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         style={{ maxHeight: "90vh" }}
         onClick={(e) => e.stopPropagation()}
       >

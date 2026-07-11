@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { Trophy, Code2, Settings, LogOut } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -25,9 +26,48 @@ export default function Header({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Derive the display initial from the user's email
+  const [bestWpm, setBestWpm] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!session?.user?.id) return;
+      try {
+        // Fetch highest WPM
+        const { data: wpmData } = await supabase
+          .from("typing_stats")
+          .select("wpm")
+          .eq("user_id", session.user.id)
+          .order("wpm", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (wpmData) {
+          setBestWpm(wpmData.wpm);
+        }
+
+        // Fetch total completed snippets
+        const { count } = await supabase
+          .from("typing_stats")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", session.user.id);
+
+        if (count !== null) {
+          setCompletedCount(count);
+        }
+      } catch (err) {
+        console.error("Failed to fetch user stats", err);
+      }
+    };
+    if (dropdownOpen) {
+      fetchStats();
+    }
+  }, [session?.user?.id, dropdownOpen]);
+
+  // Derive the display initial from the user's email or metadata
   const userEmail = session?.user?.email ?? "";
-  const avatarLetter = userEmail.charAt(0).toUpperCase() || "?";
+  const currentUsername = session?.user?.user_metadata?.username || userEmail.split('@')[0] || "Anonymous";
+  const avatarLetter = currentUsername.charAt(0).toUpperCase() || "?";
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -131,7 +171,7 @@ export default function Header({
             <div
               role="menu"
               aria-label="Account options"
-              className="absolute right-0 mt-2 w-64 rounded-2xl overflow-hidden"
+              className="absolute right-0 mt-2 w-72 rounded-2xl overflow-hidden"
               style={{
                 background: "rgba(14,21,36,0.92)",
                 border: "1px solid rgba(255,255,255,0.08)",
@@ -141,40 +181,46 @@ export default function Header({
                 animation: "dropdownIn 0.18s cubic-bezier(0.4,0,0.2,1) both",
               }}
             >
-              {/* User info header */}
-              <div
-                className="px-4 py-3 border-b"
-                style={{ borderColor: "rgba(255,255,255,0.06)" }}
-              >
-                <p className="text-xs text-on-surface-variant">Signed in as</p>
-                <p
-                  className="text-sm font-medium text-on-surface mt-0.5 truncate"
-                  title={userEmail}
-                >
-                  {userEmail}
-                </p>
-              </div>
+              <div className="p-4 flex flex-col gap-4">
+                {/* 1. Identity Block */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full shrink-0" style={{ background: "rgba(125,211,252,0.15)", color: "#7dd3fc" }}>
+                    <span className="font-bold text-lg">{avatarLetter}</span>
+                  </div>
+                  <div className="flex flex-col overflow-hidden">
+                    <span className="font-bold text-on-surface truncate leading-tight text-[15px]">{currentUsername}</span>
+                    <span className="text-sm text-gray-400 truncate mt-0.5">{userEmail}</span>
+                  </div>
+                </div>
 
-              {/* Sign out button */}
-              <div className="p-1.5">
-                <button
-                  id="header-signout-btn"
-                  role="menuitem"
-                  onClick={handleSignOut}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors duration-150 focus:outline-none"
-                  style={{ color: "#ff6b6b" }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(255,107,107,0.1)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>
-                    logout
-                  </span>
-                  Sign Out
-                </button>
+                {/* 2. Quick Stats */}
+                <div className="border-t border-gray-700/50 pt-4 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+                    <Trophy size={16} className="text-yellow-500" />
+                    <span>Best: {bestWpm} WPM</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+                    <Code2 size={16} className="text-cyan-400" />
+                    <span>Completed: {completedCount}</span>
+                  </div>
+                </div>
+
+                {/* 3. Action Links */}
+                <div className="border-t border-gray-700/50 pt-3 flex flex-col gap-1">
+                  <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-on-surface-variant transition-colors hover:bg-white/5 hover:text-on-surface focus:outline-none">
+                    <Settings size={18} />
+                    Preferences
+                  </button>
+                  <button
+                    id="header-signout-btn"
+                    role="menuitem"
+                    onClick={handleSignOut}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-400 transition-colors hover:text-red-400 hover:bg-red-500/10 focus:outline-none mt-1"
+                  >
+                    <LogOut size={18} />
+                    Sign Out
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -215,8 +215,8 @@ export default function MainCanvas({
       if (!statSaved.current) {
         statSaved.current = true;
 
-        // Extract username: everything before the '@' in the user's email
-        const username = (session.user.email ?? "").split("@")[0] || "anonymous";
+        // Extract username: check metadata first, then email, fallback to Anonymous
+        const currentUsername = session?.user?.user_metadata?.username || session?.user?.email?.split('@')[0] || 'Anonymous';
 
         (async () => {
           try {
@@ -241,7 +241,7 @@ export default function MainCanvas({
                 .from("typing_stats")
                 .insert({
                   user_id: session.user.id,
-                  username,
+                  username: currentUsername,
                   snippet_name: snippetTitle,
                   language: snippetLanguage,
                   wpm,
@@ -256,7 +256,7 @@ export default function MainCanvas({
               const { error: updateErr } = await supabase
                 .from("typing_stats")
                 .update({
-                  username,
+                  username: currentUsername,
                   wpm,
                   accuracy,
                   time_taken: timeTaken,
@@ -351,10 +351,26 @@ export default function MainCanvas({
           {/* ── Completion overlay ────────────────────────────────────── */}
           {isCompleted && (
             <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-background/60 backdrop-blur-sm">
-              <div className="text-center">
-                <span className="text-4xl">🎉</span>
-                <p className="mt-2 text-primary font-bold text-xl">Snippet Complete!</p>
-                <p className="text-on-surface-variant text-sm mt-1">Press Restart to go again</p>
+              <div className="text-center bg-[#0a101c]/95 border border-[#7dd3fc]/20 p-6 rounded-2xl shadow-2xl backdrop-blur-md" style={{ animation: "lbPanelIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both" }}>
+                <span className="text-4xl block mb-2">🎉</span>
+                <h3 className="text-primary font-bold text-xl mb-4">Snippet Complete!</h3>
+                <div className="flex gap-6 items-center justify-center text-sm mb-5 bg-white/5 rounded-xl px-5 py-3 border border-white/5">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[#8a9eb0] uppercase text-[10px] font-bold tracking-wider mb-1">Speed</span>
+                    <span className="text-[#e0e8f0] font-mono text-base">{wpm} <span className="text-xs text-[#6b8090]">WPM</span></span>
+                  </div>
+                  <div className="w-px h-8 bg-white/10"></div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-[#8a9eb0] uppercase text-[10px] font-bold tracking-wider mb-1">Accuracy</span>
+                    <span className="text-[#e0e8f0] font-mono text-base">{accuracy}%</span>
+                  </div>
+                  <div className="w-px h-8 bg-white/10"></div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-[#8a9eb0] uppercase text-[10px] font-bold tracking-wider mb-1">Time</span>
+                    <span className="text-[#e0e8f0] font-mono text-base">{timeTaken}s</span>
+                  </div>
+                </div>
+                <p className="text-[#8a9eb0] text-sm mt-1">Press Restart to go again</p>
               </div>
             </div>
           )}

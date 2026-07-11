@@ -40,9 +40,9 @@ export default function ActionFooter({ onRestart, isBlindMode, onToggleBlindMode
           aria-label="Open leaderboard"
           onClick={onOpenLeaderboard}
           className="p-3 rounded-full transition-all"
-          style={{ color: "#fbbf24" }}
+          style={{ color: "#7dd3fc" }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(251,191,36,0.12)";
+            e.currentTarget.style.background = "rgba(125,211,252,0.12)";
             e.currentTarget.style.transform = "scale(1.08)";
           }}
           onMouseLeave={(e) => {
