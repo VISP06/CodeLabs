@@ -210,7 +210,7 @@ export default function MainCanvas({
   useEffect(() => {
     if (!isCompleted || prevCompleted.current) return;
 
-    if (session) {
+    if (session?.user) {
       // ── Authenticated: smart high-score save (exactly once per run) ──
       if (!statSaved.current) {
         statSaved.current = true;
@@ -219,49 +219,56 @@ export default function MainCanvas({
         const username = (session.user.email ?? "").split("@")[0] || "anonymous";
 
         (async () => {
-          // 1. Check if a record already exists for this user + snippet
-          const { data: existing, error: fetchErr } = await supabase
-            .from("typing_stats")
-            .select("id, wpm, accuracy")
-            .eq("user_id", session.user.id)
-            .eq("snippet_name", snippetTitle)
-            .maybeSingle();
-
-          if (fetchErr) {
-            console.error("[CodeLabs] Failed to check existing record:", fetchErr.message);
-            return;
-          }
-
-          if (!existing) {
-            // 2a. No record yet — insert fresh
-            const { error: insertErr } = await supabase
+          try {
+            // 1. Check if a record already exists for this user + snippet
+            const { data: existing, error: fetchErr } = await supabase
               .from("typing_stats")
-              .insert({
-                user_id: session.user.id,
-                username,
-                snippet_name: snippetTitle,
-                language: snippetLanguage,
-                wpm,
-                accuracy,
-                time_taken: timeTaken,
-              });
-            if (insertErr)
-              console.error("[CodeLabs] Insert failed:", insertErr.message);
-          } else if (wpm > existing.wpm && accuracy >= existing.accuracy) {
-            // 2b. Existing record — only overwrite if this run is strictly better
-            const { error: updateErr } = await supabase
-              .from("typing_stats")
-              .update({
-                username,
-                wpm,
-                accuracy,
-                time_taken: timeTaken,
-              })
-              .eq("id", existing.id);
-            if (updateErr)
-              console.error("[CodeLabs] Update failed:", updateErr.message);
+              .select("id, wpm, accuracy")
+              .eq("user_id", session.user.id)
+              .eq("snippet_name", snippetTitle)
+              .maybeSingle();
+
+            if (fetchErr) {
+              console.error("[CodeLabs] Failed to check existing record:", fetchErr.message);
+              return;
+            }
+
+            console.log("ATTEMPTING TO SAVE RUN:", { wpm, accuracy, snippet_name: snippetTitle });
+
+            if (!existing) {
+              // 2a. No record yet — insert fresh
+              const { error: insertErr } = await supabase
+                .from("typing_stats")
+                .insert({
+                  user_id: session.user.id,
+                  username,
+                  snippet_name: snippetTitle,
+                  language: snippetLanguage,
+                  wpm,
+                  accuracy,
+                  time_taken: timeTaken,
+                });
+              if (insertErr) {
+                console.error("SUPABASE INSERT ERROR:", insertErr);
+              }
+            } else if (wpm > existing.wpm && accuracy >= existing.accuracy) {
+              // 2b. Existing record — only overwrite if this run is strictly better
+              const { error: updateErr } = await supabase
+                .from("typing_stats")
+                .update({
+                  username,
+                  wpm,
+                  accuracy,
+                  time_taken: timeTaken,
+                })
+                .eq("id", existing.id);
+              if (updateErr) {
+                console.error("SUPABASE UPDATE ERROR:", updateErr);
+              }
+            }
+          } catch (error) {
+            console.error("SUPABASE INSERT ERROR:", error);
           }
-          // else: existing record is already better — do nothing
         })();
       }
     } else {

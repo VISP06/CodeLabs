@@ -41,7 +41,7 @@ export const SNIPPET_LINES: SnippetLine[] = [
   },
   {
     lineNumber: 4,
-    tokens: [{ text: "        mid = (left + right) // 2", colorClass: "text-on-surface" }],
+    tokens: [{ text: "        mid = int((left + right)/2)", colorClass: "text-on-surface" }],
   },
   {
     lineNumber: 5,
@@ -196,6 +196,23 @@ export function useTypingEngine(): TypingEngineState {
         e.preventDefault();
       }
 
+      // Hijack the '/' key so it doesn't open the browser's Quick Find dialog
+      if (e.key === '/') {
+        e.stopPropagation(); 
+      }
+
+      // IDE Smart Typing: Preserve progress and auto-indent
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const lines = userInput.split('\n');
+        const lastLine = lines[lines.length - 1] || '';
+        const baseIndent = lastLine.match(/^\s*/)?.[0] || '';
+        const extraIndent = lastLine.trim().endsWith(':') ? '    ' : '';
+        
+        setUserInput(prev => prev + '\n' + baseIndent + extraIndent);
+        return; // stop execution here for Enter
+      }
+
       // Ignore modifier-only combos (Ctrl+C, etc.) except Backspace
       if (
         e.key === "Tab" ||
@@ -237,7 +254,7 @@ export function useTypingEngine(): TypingEngineState {
       // ── Only handle printable single characters and Enter ─────────────────
       if (e.key.length !== 1 && e.key !== "Enter") return;
 
-      const typedChar = e.key === "Enter" ? "\n" : e.key;
+      const typedChar = e.key;
       const currentIdx = userInput.length;
 
       if (currentIdx >= targetText.length) return; // Already at end
@@ -262,42 +279,6 @@ export function useTypingEngine(): TypingEngineState {
       const isCorrect = typedChar === expectedChar;
 
       if (isCorrect) {
-        // ── Smart Indentation: Enter auto-advances past leading spaces ────────
-        if (typedChar === "\n") {
-          // Find the start of the next line in targetText
-          const afterNewline = currentIdx + 1;
-          let leadingSpaces = 0;
-          while (
-            afterNewline + leadingSpaces < targetText.length &&
-            targetText[afterNewline + leadingSpaces] === " "
-          ) {
-            leadingSpaces++;
-          }
-
-          // Build the string to auto-append: \n + however many spaces follow
-          const autoAppend = "\n" + " ".repeat(leadingSpaces);
-
-          // ACCURACY FIX: Count only the Enter keystroke the user physically
-          // pressed (1 attempt, 1 correct). The auto-inserted spaces are free
-          // gifts — including them in the numerator while keeping the
-          // denominator at 1 would push accuracy above 100%.
-          totalAttemptsRef.current += 1;
-          correctCharsRef.current += 1;
-
-          const nextInput = userInput + autoAppend;
-          setUserInput(nextInput);
-          setErrorIndex(-1);
-          updateStats(correctCharsRef.current, totalAttemptsRef.current);
-
-          if (nextInput.length === targetText.length) {
-            setIsCompleted(true);
-            if (startTimeRef.current) {
-              const elapsedSec = (Date.now() - startTimeRef.current) / 1000;
-              setTimeTaken(Math.round(elapsedSec * 10) / 10);
-            }
-          }
-          return;
-        }
 
         // ── Smart Bracket / Quote Auto-close ─────────────────────────────────
         const closingChar = OPEN_TO_CLOSE[typedChar];

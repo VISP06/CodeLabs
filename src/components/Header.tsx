@@ -16,7 +16,7 @@ interface HeaderProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Header({
-  snippetName = "Binary Search Algorithm",
+  snippetName = "Binary Search",
   wpm = 0,
   accuracy = 100,
   session,

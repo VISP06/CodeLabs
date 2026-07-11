@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
+import { X } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -131,13 +132,12 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
         if (err) throw err;
         setRows((data as StatRow[]) ?? []);
       } else {
-        // ── Mode: Daily best across all snippets ──────────────────────────
+        // ── Mode: All-time best across all snippets ─────────────────────────
         const { data, error: err } = await supabase
           .from("typing_stats")
           .select("*")
-          .gte("created_at", todayMidnightISO())
           .order("wpm", { ascending: false })
-          .limit(10);
+          .limit(20);
 
         if (err) throw err;
         setRows((data as StatRow[]) ?? []);
@@ -156,10 +156,11 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
   }, [fetchLeaderboard]);
 
   // ── Selecting a suggestion ─────────────────────────────────────────────────
-  const selectSnippet = (snippet: string) => {
+  const handleSuggestionClick = (snippet: string) => {
     setActiveSnippet(snippet);
-    setSearchText(snippet);
+    setSearchText("");
     setShowSuggestions(false);
+    searchRef.current?.blur();
   };
 
   // ── Clearing the search ────────────────────────────────────────────────────
@@ -187,11 +188,11 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
   // ── Derived labels ─────────────────────────────────────────────────────────
   const modeLabel = activeSnippet
     ? `All-Time · ${activeSnippet}`
-    : "Today's Top Scores · All Algorithms";
+    : "All-Time Top Scores · All Algorithms";
 
   const emptyMessage = activeSnippet
     ? `No all-time scores for "${activeSnippet}" yet.`
-    : "No runs recorded today yet. Be the first!";
+    : "No runs recorded yet. Be the first!";
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -359,7 +360,7 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
               {suggestions.map((snippet) => (
                 <button
                   key={snippet}
-                  onClick={() => selectSnippet(snippet)}
+                  onClick={() => handleSuggestionClick(snippet)}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors duration-100 focus:outline-none"
                   style={{ color: "#c8dae8" }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(125,211,252,0.08)"; }}
@@ -376,6 +377,33 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
                   )}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Filter Pill UI */}
+          {activeSnippet && (
+            <div className="mt-3 flex items-center" style={{ animation: "fadeSlideIn 0.2s ease-out both" }}>
+              <button
+                onClick={() => setActiveSnippet(null)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 focus:outline-none"
+                style={{
+                  background: "linear-gradient(135deg, rgba(125,211,252,0.15), rgba(200,160,240,0.12))",
+                  border: "1px solid rgba(125,211,252,0.3)",
+                  color: "#7dd3fc",
+                  boxShadow: "0 0 14px rgba(125,211,252,0.1)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "linear-gradient(135deg, rgba(125,211,252,0.25), rgba(200,160,240,0.2))";
+                  e.currentTarget.style.boxShadow = "0 0 20px rgba(125,211,252,0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "linear-gradient(135deg, rgba(125,211,252,0.15), rgba(200,160,240,0.12))";
+                  e.currentTarget.style.boxShadow = "0 0 14px rgba(125,211,252,0.1)";
+                }}
+              >
+                <span>Filter: {activeSnippet}</span>
+                <X size={14} className="opacity-80" />
+              </button>
             </div>
           )}
         </div>
@@ -527,7 +555,7 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
           style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
         >
           <p className="text-xs text-on-surface-variant">
-            Stats saved for logged-in users only · Daily view resets at midnight
+            Stats saved for logged-in users only · Top 20 All-Time
           </p>
         </div>
       </div>
@@ -542,6 +570,10 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
           to   { opacity: 1; transform: scale(1)    translateY(0);    }
         }
         @keyframes lbSuggestIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to   { opacity: 1; transform: translateY(0);    }
+        }
+        @keyframes fadeSlideIn {
           from { opacity: 0; transform: translateY(-4px); }
           to   { opacity: 1; transform: translateY(0);    }
         }

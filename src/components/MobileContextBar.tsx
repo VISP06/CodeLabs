@@ -7,7 +7,7 @@ interface MobileContextBarProps {
 
 export default function MobileContextBar({
   language = "Python",
-  snippetName = "Binary Search Algorithm",
+  snippetName = "Binary Search",
   wpm = 0,
   accuracy = 100,
 }: MobileContextBarProps) {
