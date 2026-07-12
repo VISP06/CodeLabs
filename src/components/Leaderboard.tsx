@@ -252,7 +252,6 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
             <h2 id="leaderboard-heading" className="text-lg font-bold text-on-surface leading-tight">
               Global Leaderboard
             </h2>
-            <p className="text-xs text-on-surface-variant mt-0.5">One best score per user</p>
           </div>
 
           {/* Refresh */}
@@ -556,7 +555,7 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
           style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
         >
           <p className="text-xs text-on-surface-variant">
-            Stats saved for logged-in users only · Top 20 All-Time
+            Stats saved for logged-in users only
           </p>
         </div>
       </div>
