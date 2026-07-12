@@ -157,21 +157,102 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
         e.stopPropagation(); 
       }
 
-      // IDE Smart Typing: Preserve progress and auto-indent
+      // ── IDE Smart Typing: Tab inserts matching whitespace from target ────
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (isCompleted || errorIndex !== -1) return;
+
+        const currentIdx = userInput.length;
+        if (currentIdx >= targetText.length) return;
+
+        // Collect all upcoming whitespace (spaces/tabs) from the target
+        let advanceEnd = currentIdx;
+        while (
+          advanceEnd < targetText.length &&
+          (targetText[advanceEnd] === ' ' || targetText[advanceEnd] === '\t')
+        ) {
+          advanceEnd++;
+        }
+
+        // Only act if there is actually whitespace to skip
+        if (advanceEnd === currentIdx) return;
+
+        const inserted = targetText.slice(currentIdx, advanceEnd);
+
+        // Start timer on first keystroke
+        if (!isStarted) {
+          startTimeRef.current = Date.now();
+          setIsStarted(true);
+        }
+
+        // Credit every auto-inserted char as 1 attempt + 1 correct
+        totalAttemptsRef.current += 1;
+        correctCharsRef.current += inserted.length;
+
+        const nextInput = userInput + inserted;
+        setUserInput(nextInput);
+        setErrorIndex(-1);
+        updateStats(correctCharsRef.current, totalAttemptsRef.current);
+
+        if (nextInput.length === targetText.length) {
+          setIsCompleted(true);
+          if (startTimeRef.current) {
+            const elapsedSec = (Date.now() - startTimeRef.current) / 1000;
+            setTimeTaken(Math.round(elapsedSec * 10) / 10);
+          }
+        }
+        return;
+      }
+
+      // ── IDE Smart Typing: Enter inserts newline + auto-indent from target ─
       if (e.key === 'Enter') {
         e.preventDefault();
-        const lines = userInput.split('\n');
-        const lastLine = lines[lines.length - 1] || '';
-        const baseIndent = lastLine.match(/^\s*/)?.[0] || '';
-        const extraIndent = lastLine.trim().endsWith(':') ? '    ' : '';
-        
-        setUserInput(prev => prev + '\n' + baseIndent + extraIndent);
-        return; // stop execution here for Enter
+        if (isCompleted || errorIndex !== -1) return;
+
+        const currentIdx = userInput.length;
+        if (currentIdx >= targetText.length) return;
+
+        // The next character in the target must be a newline for Enter to work
+        if (targetText[currentIdx] !== '\n') return;
+
+        // Collect the newline + all leading whitespace on the following line
+        let advanceEnd = currentIdx + 1; // past the '\n'
+        while (
+          advanceEnd < targetText.length &&
+          (targetText[advanceEnd] === ' ' || targetText[advanceEnd] === '\t')
+        ) {
+          advanceEnd++;
+        }
+
+        const inserted = targetText.slice(currentIdx, advanceEnd);
+
+        // Start timer on first keystroke
+        if (!isStarted) {
+          startTimeRef.current = Date.now();
+          setIsStarted(true);
+        }
+
+        // Credit every auto-inserted char as 1 attempt + 1 correct
+        totalAttemptsRef.current += 1;
+        correctCharsRef.current += inserted.length;
+
+        const nextInput = userInput + inserted;
+        setUserInput(nextInput);
+        setErrorIndex(-1);
+        updateStats(correctCharsRef.current, totalAttemptsRef.current);
+
+        if (nextInput.length === targetText.length) {
+          setIsCompleted(true);
+          if (startTimeRef.current) {
+            const elapsedSec = (Date.now() - startTimeRef.current) / 1000;
+            setTimeTaken(Math.round(elapsedSec * 10) / 10);
+          }
+        }
+        return;
       }
 
       // Ignore modifier-only combos (Ctrl+C, etc.) except Backspace
       if (
-        e.key === "Tab" ||
         (e.ctrlKey && e.key !== "Backspace") ||
         (e.altKey && e.key !== "Backspace") ||
         (e.metaKey && e.key !== "Backspace")

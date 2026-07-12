@@ -3,7 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import { useTypingEngine } from "./hooks/useTypingEngine";
 import type { Language } from "./data/snippets";
-import { LANGUAGE_LABELS, snippets } from "./data/snippets";
+import { snippets } from "./data/snippets";
 import Header from "./components/Header";
 import MainCanvas from "./components/MainCanvas";
 import ActionFooter from "./components/ActionFooter";
@@ -133,7 +133,6 @@ export default function App() {
   // Derive snippet metadata from the active language
   const activeSnippet = snippets[activeLanguage][0];
   const snippetTitle = activeSnippet.title;
-  const snippetLanguage = LANGUAGE_LABELS[activeLanguage];
 
   // Suppress the unused-variable lint warning for guestCompletions
   void guestCompletions;
@@ -168,7 +167,6 @@ export default function App() {
           timeTaken={timeTaken}
           liveTime={liveTime}
           snippetTitle={snippetTitle}
-          snippetLanguage={snippetLanguage}
           snippetLines={snippetLines}
           onGuestComplete={handleGuestComplete}
           showPaywall={showPaywall}

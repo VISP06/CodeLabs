@@ -28,8 +28,6 @@ interface MainCanvasProps {
   snippetTitle: string;
   /** Active snippet lines for syntax highlighting */
   snippetLines: SnippetLine[];
-  /** Programming language label stored alongside the record */
-  snippetLanguage: string;
   /** Callback to tell App to increment the guest completion counter */
   onGuestComplete: () => void;
   /** Controls paywall modal visibility (lifted to App) */
@@ -138,9 +136,9 @@ function PaywallModal({ onClose }: { onClose: () => void }) {
           style={{ background: "rgba(125,211,252,0.05)", border: "1px solid rgba(125,211,252,0.1)" }}
         >
           {[
-            { icon: "speed",          label: "WPM Tracking"     },
-            { icon: "history",        label: "Progress History"  },
-            { icon: "workspace_premium", label: "More Snippets"  },
+            { icon: "speed", label: "WPM Tracking" },
+            { icon: "history", label: "Progress History" },
+            { icon: "workspace_premium", label: "More Snippets" },
           ].map(({ icon, label }) => (
             <div key={label} className="flex-1 flex flex-col items-center gap-1">
               <span className="material-symbols-outlined text-primary" style={{ fontSize: "20px" }}>
@@ -191,7 +189,6 @@ export default function MainCanvas({
   timeTaken,
   snippetTitle,
   snippetLines,
-  snippetLanguage,
   onGuestComplete,
   showPaywall,
   onClosePaywall,
@@ -216,6 +213,70 @@ export default function MainCanvas({
     }
   }, [isCompleted]);
 
+  const handleSnippetComplete = async (finalWpm: number, finalAccuracy: number, finalTime: number) => {
+    const currentUsername = session?.user?.user_metadata?.username || session?.user?.email?.split('@')[0] || 'Anonymous';
+    const snippetName = snippetTitle;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return; // Stop if not logged in
+
+      // 1. Fetch the existing run for this specific user, snippet, and language
+      const { data: existingRun, error: fetchError } = await supabase
+        .from('typing_stats')
+        .select('*')
+        .eq('snippet_name', snippetName)
+        .eq('language', activeLanguage)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Fetch Error:", fetchError);
+        return;
+      }
+
+      if (existingRun) {
+        // 2. ONLY update if the new WPM is higher
+        if (finalWpm > existingRun.wpm) {
+          const { data: updatedData, error: updateError } = await supabase
+            .from('typing_stats')
+            .update({ wpm: finalWpm, accuracy: finalAccuracy, time_taken: finalTime })
+            .eq('user_id', user.id)
+            .eq('snippet_name', snippetName)
+            .eq('language', activeLanguage)
+            .select(); // Force Supabase to return the modified row
+
+          if (updateError) {
+            console.log("Update blocked by database: " + updateError.message);
+            console.error("Update Error:", updateError);
+          } else if (!updatedData || updatedData.length === 0) {
+            // THIS IS THE SILENT FAILURE DETECTOR
+            console.log("🚨 SILENT DROP: Supabase blocked the update! Check your RLS UPDATE policies.");
+          }
+        }
+      } else {
+        // 3. Fresh insert - Explicitly passing user_id to prevent null constraints
+        const { error: insertError } = await supabase
+          .from('typing_stats')
+          .insert([{
+            snippet_name: snippetName,
+            wpm: finalWpm,
+            accuracy: finalAccuracy,
+            time_taken: finalTime,
+            language: activeLanguage,
+            username: currentUsername,
+            user_id: user.id
+          }]);
+
+        if (insertError) {
+          console.log("Insert blocked by database: " + insertError.message);
+          console.error("Insert Error:", insertError);
+        }
+      }
+    } catch (err) {
+      console.error("Critical DB Save Error:", err);
+    }
+  };
   // Detect rising edge of isCompleted
   useEffect(() => {
     if (!isCompleted || prevCompleted.current) return;
@@ -224,62 +285,7 @@ export default function MainCanvas({
       // ── Authenticated: smart high-score save (exactly once per run) ──
       if (!statSaved.current) {
         statSaved.current = true;
-
-        // Extract username: check metadata first, then email, fallback to Anonymous
-        const currentUsername = session?.user?.user_metadata?.username || session?.user?.email?.split('@')[0] || 'Anonymous';
-
-        (async () => {
-          try {
-            // 1. Check if a record already exists for this user + snippet
-            const { data: existing, error: fetchErr } = await supabase
-              .from("typing_stats")
-              .select("id, wpm, accuracy")
-              .eq("user_id", session.user.id)
-              .eq("snippet_name", snippetTitle)
-              .maybeSingle();
-
-            if (fetchErr) {
-              console.error("[CodeLabs] Failed to check existing record:", fetchErr.message);
-              return;
-            }
-
-            console.log("ATTEMPTING TO SAVE RUN:", { wpm, accuracy, snippet_name: snippetTitle });
-
-            if (!existing) {
-              // 2a. No record yet — insert fresh
-              const { error: insertErr } = await supabase
-                .from("typing_stats")
-                .insert({
-                  user_id: session.user.id,
-                  username: currentUsername,
-                  snippet_name: snippetTitle,
-                  language: activeLanguage,
-                  wpm,
-                  accuracy,
-                  time_taken: timeTaken,
-                });
-              if (insertErr) {
-                console.error("SUPABASE INSERT ERROR:", insertErr);
-              }
-            } else if (wpm > existing.wpm && accuracy >= existing.accuracy) {
-              // 2b. Existing record — only overwrite if this run is strictly better
-              const { error: updateErr } = await supabase
-                .from("typing_stats")
-                .update({
-                  username: currentUsername,
-                  wpm,
-                  accuracy,
-                  time_taken: timeTaken,
-                })
-                .eq("id", existing.id);
-              if (updateErr) {
-                console.error("SUPABASE UPDATE ERROR:", updateErr);
-              }
-            }
-          } catch (error) {
-            console.error("SUPABASE INSERT ERROR:", error);
-          }
-        })();
+        handleSnippetComplete(wpm, accuracy, timeTaken);
       }
     } else {
       // ── Guest: increment paywall counter ───────────────────────────
@@ -287,7 +293,7 @@ export default function MainCanvas({
     }
 
     prevCompleted.current = isCompleted;
-  }, [isCompleted, session, wpm, accuracy, timeTaken, onGuestComplete]);
+  }, [isCompleted, session, wpm, accuracy, timeTaken, onGuestComplete, activeLanguage, snippetTitle]);
 
   // Keep prevCompleted in sync when isCompleted resets to false
   useEffect(() => {
@@ -336,9 +342,9 @@ export default function MainCanvas({
                 <div key={lineIndex} className="flex flex-row whitespace-pre">
                   {line.split("").map((char) => {
                     const currentIndex = globalCharIndex++;
-                    const isTyped   = currentIndex < userInput.length;
+                    const isTyped = currentIndex < userInput.length;
                     const isCurrent = currentIndex === userInput.length;
-                    const isError   = isTyped && userInput[currentIndex] !== char;
+                    const isError = isTyped && userInput[currentIndex] !== char;
                     const cursorColorClass = errorIndex !== -1 ? "border-red-500" : "border-[#7ae2ff]";
 
                     return (
