@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import { useTypingEngine } from "./hooks/useTypingEngine";
+import type { Language } from "./data/snippets";
+import { LANGUAGE_LABELS, snippets } from "./data/snippets";
 import Header from "./components/Header";
 import MainCanvas from "./components/MainCanvas";
 import ActionFooter from "./components/ActionFooter";
@@ -98,6 +100,9 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [isBlindMode, setIsBlindMode] = useState(false);
 
+  // ── Language state ───────────────────────────────────────────────────────────
+  const [activeLanguage, setActiveLanguage] = useState<Language>("python");
+
   // ── Guest paywall ────────────────────────────────────────────────────────────
   const [guestCompletions, setGuestCompletions] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
@@ -118,10 +123,17 @@ export default function App() {
     wpm,
     accuracy,
     timeTaken,
+    liveTime,
     isCompleted,
+    snippetLines,
     focusInput,
     restart,
-  } = useTypingEngine();
+  } = useTypingEngine(activeLanguage);
+
+  // Derive snippet metadata from the active language
+  const activeSnippet = snippets[activeLanguage][0];
+  const snippetTitle = activeSnippet.title;
+  const snippetLanguage = LANGUAGE_LABELS[activeLanguage];
 
   // Suppress the unused-variable lint warning for guestCompletions
   void guestCompletions;
@@ -136,9 +148,6 @@ export default function App() {
 
       {/* Sticky top header */}
       <Header
-        snippetName="Binary Search"
-        wpm={wpm}
-        accuracy={accuracy}
         session={session}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />
@@ -156,11 +165,15 @@ export default function App() {
           wpm={wpm}
           accuracy={accuracy}
           timeTaken={timeTaken}
-          snippetTitle="Binary Search"
-          snippetLanguage="Python"
+          liveTime={liveTime}
+          snippetTitle={snippetTitle}
+          snippetLanguage={snippetLanguage}
+          snippetLines={snippetLines}
           onGuestComplete={handleGuestComplete}
           showPaywall={showPaywall}
           onClosePaywall={() => setShowPaywall(false)}
+          activeLanguage={activeLanguage}
+          setActiveLanguage={setActiveLanguage}
         />
       </main>
 

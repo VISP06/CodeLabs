@@ -1,8 +1,9 @@
 import { useRef, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
-import { SNIPPET_LINES } from "../hooks/useTypingEngine";
+import type { Language, SnippetLine } from "../data/snippets";
 import Auth from "./Auth";
+import LanguageDropdown from "./LanguageDropdown";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,8 @@ interface MainCanvasProps {
   timeTaken: number;
   /** Canonical snippet title used as the DB key (e.g. "Binary Search") */
   snippetTitle: string;
+  /** Active snippet lines for syntax highlighting */
+  snippetLines: SnippetLine[];
   /** Programming language label stored alongside the record */
   snippetLanguage: string;
   /** Callback to tell App to increment the guest completion counter */
@@ -32,14 +35,17 @@ interface MainCanvasProps {
   /** Controls paywall modal visibility (lifted to App) */
   showPaywall: boolean;
   onClosePaywall: () => void;
+  activeLanguage: Language;
+  setActiveLanguage: (lang: Language) => void;
+  liveTime: number;
 }
 
 // ── Char-style helper ─────────────────────────────────────────────────────────
 
-const getCharStyle = (index: number): string => {
+const getCharStyle = (index: number, snippetLines: SnippetLine[]): string => {
   let count = 0;
-  for (let li = 0; li < SNIPPET_LINES.length; li++) {
-    const line = SNIPPET_LINES[li];
+  for (let li = 0; li < snippetLines.length; li++) {
+    const line = snippetLines[li];
     for (let ti = 0; ti < line.tokens.length; ti++) {
       const token = line.tokens[ti];
       if (index >= count && index < count + token.text.length) {
@@ -184,10 +190,14 @@ export default function MainCanvas({
   accuracy,
   timeTaken,
   snippetTitle,
+  snippetLines,
   snippetLanguage,
   onGuestComplete,
   showPaywall,
   onClosePaywall,
+  activeLanguage,
+  setActiveLanguage,
+  liveTime,
 }: MainCanvasProps) {
   const cursorRef = useRef<HTMLSpanElement | null>(null);
   const prevCompleted = useRef(false);
@@ -289,6 +299,27 @@ export default function MainCanvas({
 
   return (
     <>
+      <div className="flex justify-between items-center w-full max-w-[900px] mb-4">
+        {/* Left Side: Dropdown & Breadcrumb Title */}
+        <div className="flex items-center gap-4">
+          <LanguageDropdown
+            activeLanguage={activeLanguage}
+            setActiveLanguage={setActiveLanguage}
+          />
+          <span className="text-sm font-medium text-on-surface-variant/80">
+            {snippetLanguage} / {snippetTitle}
+          </span>
+        </div>
+
+        {/* Right Side: Live Stats Pill */}
+        <div className="flex bg-white/5 px-4 py-1.5 rounded-full border border-white/10 backdrop-blur-md">
+          <span className="text-sm font-mono text-on-surface-variant">
+            WPM: <strong className="text-primary">{wpm}</strong> | Acc:{" "}
+            <strong className="text-primary">{accuracy}%</strong> | Time:{" "}
+            <strong className="text-primary">{liveTime.toFixed(1)}s</strong>
+          </span>
+        </div>
+      </div>
       <div
         className="w-full max-w-[900px] flex-grow flex flex-col justify-center px-4 overflow-hidden relative mb-24"
         onClick={onFocus}
@@ -321,7 +352,7 @@ export default function MainCanvas({
                           relative inline-block
                           ${isError ? "text-red-500 bg-red-500/20" : isTyped ? "opacity-100" : isBlindMode ? "opacity-0" : "opacity-30"}
                           ${isCurrent ? `border-l-2 ${cursorColorClass} animate-blink` : "border-l-2 border-transparent"}
-                          ${getCharStyle(currentIndex)}
+                          ${getCharStyle(currentIndex, snippetLines)}
                         `.trim()}
                       >
                         {char}

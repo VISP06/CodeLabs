@@ -1,99 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  type Language,
+  type SnippetLine,
+  snippets,
+  buildTargetText,
+} from "../data/snippets";
 
-// ── Snippet data ──────────────────────────────────────────────────────────────
+// ── Re-exports for consumers that still import from here ─────────────────────
 
-export interface CodeToken {
-  text: string;
-  /** Tailwind color class for this token */
-  colorClass: string;
-}
-
-export interface SnippetLine {
-  lineNumber: number;
-  tokens: CodeToken[];
-}
-
-export const SNIPPET_LINES: SnippetLine[] = [
-  {
-    lineNumber: 1,
-    tokens: [
-      { text: "def", colorClass: "text-[#c8a0f0] font-medium" },
-      { text: " ", colorClass: "text-on-surface" },
-      { text: "binary_search", colorClass: "text-primary" },
-      { text: "(arr, target):", colorClass: "text-on-surface" },
-    ],
-  },
-  {
-    lineNumber: 2,
-    tokens: [
-      { text: "    left, right = 0, ", colorClass: "text-on-surface" },
-      { text: "len", colorClass: "text-primary" },
-      { text: "(arr) - 1", colorClass: "text-on-surface" },
-    ],
-  },
-  {
-    lineNumber: 3,
-    tokens: [
-      { text: "    ", colorClass: "text-on-surface" },
-      { text: "while", colorClass: "text-[#c8a0f0]" },
-      { text: " left <= right:", colorClass: "text-on-surface" },
-    ],
-  },
-  {
-    lineNumber: 4,
-    tokens: [{ text: "        mid = (left + right) // 2", colorClass: "text-on-surface" }],
-  },
-  {
-    lineNumber: 5,
-    tokens: [
-      { text: "        ", colorClass: "text-on-surface" },
-      { text: "if", colorClass: "text-[#c8a0f0]" },
-      { text: " arr[mid] == target:", colorClass: "text-on-surface" },
-    ],
-  },
-  {
-    lineNumber: 6,
-    tokens: [
-      { text: "            ", colorClass: "text-on-surface" },
-      { text: "return", colorClass: "text-[#c8a0f0]" },
-      { text: " mid", colorClass: "text-on-surface" },
-    ],
-  },
-  {
-    lineNumber: 7,
-    tokens: [
-      { text: "        ", colorClass: "text-on-surface" },
-      { text: "elif", colorClass: "text-[#c8a0f0]" },
-      { text: " arr[mid] < target:", colorClass: "text-on-surface" },
-    ],
-  },
-  {
-    lineNumber: 8,
-    tokens: [{ text: "            left = mid + 1", colorClass: "text-on-surface" }],
-  },
-  {
-    lineNumber: 9,
-    tokens: [
-      { text: "        ", colorClass: "text-on-surface" },
-      { text: "else", colorClass: "text-[#c8a0f0]" },
-      { text: ":", colorClass: "text-on-surface" },
-    ],
-  },
-  {
-    lineNumber: 10,
-    tokens: [{ text: "            right = mid - 1", colorClass: "text-on-surface" }],
-  },
-];
-
-/**
- * Flatten all tokens across all lines into a single string.
- * Lines are separated by "\n".
- */
-function buildTargetText(lines: SnippetLine[]): string {
-  return lines
-    .map((line) => line.tokens.map((t) => t.text).join(""))
-    .join("\n");
-}
+export type { CodeToken, SnippetLine, Snippet, Language } from "../data/snippets";
+export { snippets, buildTargetText, LANGUAGE_LABELS } from "../data/snippets";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -108,10 +24,14 @@ export interface TypingEngineState {
   accuracy: number;
   /** Elapsed time in seconds from first keystroke to completion (0 while running) */
   timeTaken: number;
+  /** Live elapsed time in seconds, updated every 100ms while typing */
+  liveTime: number;
   /** Whether the user has started typing */
   isStarted: boolean;
   /** Whether the snippet is fully completed */
   isCompleted: boolean;
+  /** The active snippet lines (for syntax highlighting in MainCanvas) */
+  snippetLines: SnippetLine[];
   /** Ref to the hidden textarea for focus management */
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   /** Call this to focus the input area */
@@ -122,8 +42,10 @@ export interface TypingEngineState {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useTypingEngine(): TypingEngineState {
-  const targetText = buildTargetText(SNIPPET_LINES);
+export function useTypingEngine(activeLanguage: Language): TypingEngineState {
+  // Pick the first snippet for the active language
+  const activeSnippetLines = snippets[activeLanguage][0].lines;
+  const targetText = buildTargetText(activeSnippetLines);
 
   const [userInput, setUserInput] = useState("");
   const [errorIndex, setErrorIndex] = useState(-1);
@@ -131,6 +53,8 @@ export function useTypingEngine(): TypingEngineState {
   const [accuracy, setAccuracy] = useState(100);
   /** Seconds elapsed from first keystroke to completion; 0 while still running */
   const [timeTaken, setTimeTaken] = useState(0);
+  /** Live time that ticks while the user is typing */
+  const [liveTime, setLiveTime] = useState(0);
   const [isStarted, setIsStarted] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -149,6 +73,38 @@ export function useTypingEngine(): TypingEngineState {
    * we consume one skip token instead of registering the keystroke.
    */
   const autoSkipCountRef = useRef(0);
+
+  // ── Live timer tick ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!isStarted || isCompleted) return;
+
+    const interval = setInterval(() => {
+      if (startTimeRef.current) {
+        const elapsed = (Date.now() - startTimeRef.current) / 1000;
+        setLiveTime(Math.round(elapsed * 10) / 10);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isStarted, isCompleted]);
+
+  // ── Reset when language changes ─────────────────────────────────────────────
+
+  useEffect(() => {
+    setUserInput("");
+    setErrorIndex(-1);
+    setWpm(0);
+    setAccuracy(100);
+    setTimeTaken(0);
+    setLiveTime(0);
+    setIsStarted(false);
+    setIsCompleted(false);
+    startTimeRef.current = null;
+    totalAttemptsRef.current = 0;
+    correctCharsRef.current = 0;
+    autoSkipCountRef.current = 0;
+  }, [activeLanguage]);
 
   // ── Stats updater ──────────────────────────────────────────────────────────
 
@@ -356,6 +312,7 @@ export function useTypingEngine(): TypingEngineState {
     setWpm(0);
     setAccuracy(100);
     setTimeTaken(0);
+    setLiveTime(0);
     setIsStarted(false);
     setIsCompleted(false);
     startTimeRef.current = null;
@@ -378,8 +335,10 @@ export function useTypingEngine(): TypingEngineState {
     wpm,
     accuracy,
     timeTaken,
+    liveTime,
     isStarted,
     isCompleted,
+    snippetLines: activeSnippetLines,
     inputRef,
     focusInput,
     restart,
