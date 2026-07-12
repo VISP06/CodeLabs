@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
-import { X } from "lucide-react";
+import { X, ChevronDown } from "lucide-react";
+import { type Language, LANGUAGE_LABELS } from "../data/snippets";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,11 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // ── Language filter state ──────────────────────────────────────────────────
+  const [leaderboardLanguage, setLeaderboardLanguage] = useState<Language>("python");
+  const [langDropOpen, setLangDropOpen] = useState(false);
+  const langDropRef = useRef<HTMLDivElement>(null);
+
   // ── Data state ─────────────────────────────────────────────────────────────
   const [rows, setRows] = useState<StatRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +115,9 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
       ) {
         setShowSuggestions(false);
       }
+      if (langDropRef.current && !langDropRef.current.contains(e.target as Node)) {
+        setLangDropOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -126,6 +135,7 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
           .from("typing_stats")
           .select("*")
           .eq("snippet_name", activeSnippet)
+          .eq("language", leaderboardLanguage)
           .order("wpm", { ascending: false })
           .limit(10);
 
@@ -136,6 +146,7 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
         const { data, error: err } = await supabase
           .from("typing_stats")
           .select("*")
+          .eq("language", leaderboardLanguage)
           .order("wpm", { ascending: false })
           .limit(20);
 
@@ -149,7 +160,7 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
     } finally {
       setLoading(false);
     }
-  }, [activeSnippet]);
+  }, [activeSnippet, leaderboardLanguage]);
 
   useEffect(() => {
     fetchLeaderboard();
@@ -408,24 +419,132 @@ export default function Leaderboard({ onClose }: LeaderboardProps) {
           )}
         </div>
 
-        {/* ── Mode sub-header ──────────────────────────────────────────────── */}
-        <div className="px-5 py-2 shrink-0 flex items-center gap-2">
-          <span
-            className="material-symbols-outlined"
-            style={{
-              fontSize: "14px",
-              color: activeSnippet ? "#7dd3fc" : "#fbbf24",
-              fontVariationSettings: "'FILL' 1",
-            }}
-          >
-            {activeSnippet ? "filter_alt" : "today"}
-          </span>
-          <span
-            className="text-xs font-semibold uppercase tracking-wider"
-            style={{ color: activeSnippet ? "#7dd3fc" : "#fbbf24" }}
-          >
-            {modeLabel}
-          </span>
+        {/* ── Language filter + Mode sub-header ─────────────────────────────── */}
+        <div
+          className="px-5 py-2 shrink-0 flex items-center justify-between gap-2"
+          style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+        >
+          {/* Mode label */}
+          <div className="flex items-center gap-2">
+            <span
+              className="material-symbols-outlined"
+              style={{
+                fontSize: "14px",
+                color: activeSnippet ? "#7dd3fc" : "#fbbf24",
+                fontVariationSettings: "'FILL' 1",
+              }}
+            >
+              {activeSnippet ? "filter_alt" : "today"}
+            </span>
+            <span
+              className="text-xs font-semibold uppercase tracking-wider"
+              style={{ color: activeSnippet ? "#7dd3fc" : "#fbbf24" }}
+            >
+              {modeLabel}
+            </span>
+          </div>
+
+          {/* Language dropdown */}
+          <div className="relative" ref={langDropRef}>
+            <button
+              id="leaderboard-language-btn"
+              aria-label="Filter by language"
+              aria-expanded={langDropOpen}
+              aria-haspopup="listbox"
+              onClick={() => setLangDropOpen((v) => !v)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all duration-150 focus:outline-none select-none"
+              style={{
+                background: langDropOpen ? "rgba(125,211,252,0.12)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${langDropOpen ? "rgba(125,211,252,0.35)" : "rgba(255,255,255,0.1)"}`,
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                color: langDropOpen ? "#7dd3fc" : "#b8c9d9",
+              }}
+              onMouseEnter={(e) => {
+                if (!langDropOpen) {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                  e.currentTarget.style.borderColor = "rgba(125,211,252,0.25)";
+                  e.currentTarget.style.color = "#7dd3fc";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!langDropOpen) {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
+                  e.currentTarget.style.color = "#b8c9d9";
+                }
+              }}
+            >
+              <span>{LANGUAGE_LABELS[leaderboardLanguage]}</span>
+              <ChevronDown
+                size={12}
+                className="transition-transform duration-200"
+                style={{ transform: langDropOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+              />
+            </button>
+
+            {langDropOpen && (
+              <div
+                role="listbox"
+                aria-label="Language options"
+                className="absolute right-0 mt-1.5 w-36 rounded-xl overflow-hidden z-[60]"
+                style={{
+                  background: "rgba(14,21,36,0.95)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  backdropFilter: "blur(20px)",
+                  WebkitBackdropFilter: "blur(20px)",
+                  boxShadow: "0 12px 40px rgba(0,0,0,0.55), 0 0 20px rgba(125,211,252,0.04)",
+                  animation: "lbSuggestIn 0.12s ease both",
+                }}
+              >
+                <div className="p-1">
+                  {(["python", "cpp", "java"] as Language[]).map((lang) => {
+                    const isActive = lang === leaderboardLanguage;
+                    return (
+                      <button
+                        key={lang}
+                        role="option"
+                        aria-selected={isActive}
+                        id={`leaderboard-lang-${lang}`}
+                        onClick={() => {
+                          setLeaderboardLanguage(lang);
+                          setLangDropOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all duration-100 focus:outline-none"
+                        style={{
+                          background: isActive ? "rgba(125,211,252,0.1)" : "transparent",
+                          color: isActive ? "#7dd3fc" : "#b8c9d9",
+                          fontWeight: isActive ? 600 : 400,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = "rgba(255,255,255,0.06)";
+                            e.currentTarget.style.color = "#e0e8f0";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = "transparent";
+                            e.currentTarget.style.color = "#b8c9d9";
+                          }
+                        }}
+                      >
+                        <span>{LANGUAGE_LABELS[lang]}</span>
+                        {isActive && (
+                          <span
+                            className="ml-auto material-symbols-outlined"
+                            style={{ fontSize: "14px", color: "#7dd3fc" }}
+                          >
+                            check
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── Column headers ────────────────────────────────────────────────── */}

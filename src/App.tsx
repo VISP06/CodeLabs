@@ -148,6 +148,7 @@ export default function App() {
 
       {/* Sticky top header */}
       <Header
+        snippetName={snippetTitle}
         session={session}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />

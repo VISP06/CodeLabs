@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface HeaderProps {
+  snippetName?: string;
   session: Session | null;
   /** Opens the auth modal from App — used by Log In button and Sign Out */
   onOpenAuthModal: () => void;
@@ -14,6 +15,7 @@ interface HeaderProps {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Header({
+  snippetName = "Binary Search",
   session,
   onOpenAuthModal,
 }: HeaderProps) {
@@ -90,6 +92,15 @@ export default function Header({
         <div className="flex items-center gap-2 text-primary hover:opacity-80 transition-all cursor-pointer shrink-0">
           <span className="material-symbols-outlined text-3xl font-bold">terminal</span>
           <span className="text-xl font-bold tracking-tight">&gt;_ CodeLabs</span>
+        </div>
+      </div>
+
+      {/* ── Center Column: Snippet Title (desktop only) ───────────────── */}
+      <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex justify-center">
+        <div className="bg-white/5 border border-white/10 px-4 py-1.5 rounded-full backdrop-blur-md">
+          <span className="text-sm font-medium text-on-surface-variant">
+            {snippetName}
+          </span>
         </div>
       </div>
 

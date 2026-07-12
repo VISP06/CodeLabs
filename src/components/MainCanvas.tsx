@@ -253,7 +253,7 @@ export default function MainCanvas({
                   user_id: session.user.id,
                   username: currentUsername,
                   snippet_name: snippetTitle,
-                  language: snippetLanguage,
+                  language: activeLanguage,
                   wpm,
                   accuracy,
                   time_taken: timeTaken,
@@ -300,15 +300,12 @@ export default function MainCanvas({
   return (
     <>
       <div className="flex justify-between items-center w-full max-w-[900px] mb-4">
-        {/* Left Side: Dropdown & Breadcrumb Title */}
+        {/* Left Side: Dropdown */}
         <div className="flex items-center gap-4">
           <LanguageDropdown
             activeLanguage={activeLanguage}
             setActiveLanguage={setActiveLanguage}
           />
-          <span className="text-sm font-medium text-on-surface-variant/80">
-            {snippetLanguage} / {snippetTitle}
-          </span>
         </div>
 
         {/* Right Side: Live Stats Pill */}
