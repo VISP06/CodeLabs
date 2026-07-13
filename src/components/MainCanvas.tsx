@@ -203,7 +203,7 @@ export default function MainCanvas({
 
   // Scroll the active cursor character into view
   useEffect(() => {
-    cursorRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    cursorRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [userInput.length]);
 
   // Reset the save-guard whenever a new run starts (isCompleted goes false again)
@@ -327,7 +327,7 @@ export default function MainCanvas({
         className="w-full max-w-[900px] flex-grow flex flex-col justify-center px-4 overflow-hidden relative mb-24"
         onClick={onFocus}
       >
-        <div className="w-full glass rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-y-auto hide-scroll ring-1 ring-white/5">
+        <div className="w-full glass rounded-2xl p-6 sm:p-8 pb-[50vh] sm:pb-[50vh] shadow-2xl relative overflow-y-auto hide-scroll ring-1 ring-white/5 max-h-[60vh]">
           <div className="flex flex-row gap-4 font-mono text-[16px]">
             {/* Left Column (Line Numbers) */}
             <div className="flex flex-col text-right select-none opacity-40 min-w-[3rem] border-r border-white/10 pr-4 mr-2">
@@ -337,9 +337,9 @@ export default function MainCanvas({
             </div>
 
             {/* Right Column (Code Text) */}
-            <div className="flex flex-col relative">
+            <div className="flex flex-col relative w-full overflow-hidden">
               {lines.map((line, lineIndex) => (
-                <div key={lineIndex} className="flex flex-row whitespace-pre">
+                <div key={lineIndex} className="flex flex-row flex-wrap whitespace-pre-wrap break-words">
                   {line.split("").map((char) => {
                     const currentIndex = globalCharIndex++;
                     const isTyped = currentIndex < userInput.length;

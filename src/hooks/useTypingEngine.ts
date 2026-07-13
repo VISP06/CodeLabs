@@ -30,8 +30,6 @@ export interface TypingEngineState {
   isStarted: boolean;
   /** Whether the snippet is fully completed */
   isCompleted: boolean;
-  /** The active snippet lines (for syntax highlighting in MainCanvas) */
-  snippetLines: SnippetLine[];
   /** Ref to the hidden textarea for focus management */
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   /** Call this to focus the input area */
@@ -42,11 +40,7 @@ export interface TypingEngineState {
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useTypingEngine(activeLanguage: Language): TypingEngineState {
-  // Pick the first snippet for the active language
-  const activeSnippetLines = snippets[activeLanguage][0].lines;
-  const targetText = buildTargetText(activeSnippetLines);
-
+export function useTypingEngine(targetText: string): TypingEngineState {
   const [userInput, setUserInput] = useState("");
   const [errorIndex, setErrorIndex] = useState(-1);
   const [wpm, setWpm] = useState(0);
@@ -88,7 +82,7 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
     return () => clearInterval(interval);
   }, [isStarted, isCompleted]);
 
-  // ── Reset when language changes ─────────────────────────────────────────────
+  // ── Reset when targetText changes ─────────────────────────────────────────────
 
   useEffect(() => {
     setUserInput("");
@@ -103,7 +97,7 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
     startTimeRef.current = null;
     correctCharsRef.current = 0;
     autoSkipCountRef.current = 0;
-  }, [activeLanguage]);
+  }, [targetText]);
 
   // ── Stats updater ──────────────────────────────────────────────────────────
 
@@ -412,7 +406,6 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
     liveTime,
     isStarted,
     isCompleted,
-    snippetLines: activeSnippetLines,
     inputRef,
     focusInput,
     restart,

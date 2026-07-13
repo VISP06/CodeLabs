@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import { useTypingEngine } from "./hooks/useTypingEngine";
-import type { Language } from "./data/snippets";
-import { snippets } from "./data/snippets";
+import type { Language, SnippetLine } from "./data/snippets";
+import { snippets, buildTargetText } from "./data/snippets";
+import { getOrFetchSnippet } from "./utils/snippetService";
 import Header from "./components/Header";
 import MainCanvas from "./components/MainCanvas";
 import ActionFooter from "./components/ActionFooter";
@@ -103,6 +104,18 @@ export default function App() {
   // ── Language state ───────────────────────────────────────────────────────────
   const [activeLanguage, setActiveLanguage] = useState<Language>("python");
 
+  // ── Snippet State ────────────────────────────────────────────────────────────
+  const [targetText, setTargetText] = useState(() => buildTargetText(snippets["python"][0].lines));
+  const [snippetTitle, setSnippetTitle] = useState(() => snippets["python"][0].title);
+  const [snippetLines, setSnippetLines] = useState<SnippetLine[]>(() => snippets["python"][0].lines);
+
+  useEffect(() => {
+    const defaultSnip = snippets[activeLanguage][0];
+    setTargetText(buildTargetText(defaultSnip.lines));
+    setSnippetTitle(defaultSnip.title);
+    setSnippetLines(defaultSnip.lines);
+  }, [activeLanguage]);
+
   // ── Guest paywall ────────────────────────────────────────────────────────────
   const [guestCompletions, setGuestCompletions] = useState(0);
   const [showPaywall, setShowPaywall] = useState(false);
@@ -117,7 +130,6 @@ export default function App() {
 
   // ── Typing engine ─────────────────────────────────────────────────────────────
   const {
-    targetText,
     userInput,
     errorIndex,
     wpm,
@@ -125,14 +137,16 @@ export default function App() {
     timeTaken,
     liveTime,
     isCompleted,
-    snippetLines,
     focusInput,
     restart,
-  } = useTypingEngine(activeLanguage);
+  } = useTypingEngine(targetText);
 
-  // Derive snippet metadata from the active language
-  const activeSnippet = snippets[activeLanguage][0];
-  const snippetTitle = activeSnippet.title;
+  const handleSnippetFetch = (code: string, title: string) => {
+    setTargetText(code);
+    setSnippetTitle(title);
+    setSnippetLines([]); // Fetched snippets don't have tokenized lines
+    restart(); // Reset typing test states
+  };
 
   // Suppress the unused-variable lint warning for guestCompletions
   void guestCompletions;
@@ -150,10 +164,13 @@ export default function App() {
         snippetName={snippetTitle}
         session={session}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        activeLanguage={activeLanguage}
+        onSnippetFetch={handleSnippetFetch}
       />
 
       {/* Main typing canvas */}
       <main className="flex-1 flex flex-col items-center justify-center py-8 px-4">
+
         <MainCanvas
           targetText={targetText}
           userInput={userInput}

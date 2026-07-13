@@ -2,6 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { Trophy, Code2, Settings, LogOut } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { getOrFetchSnippet } from "../utils/snippetService";
+import type { Language } from "../data/snippets";
+
+const POPULAR_ALGOS = ["Binary Search", "Bubble Sort", "Merge Sort", "Quick Sort", "Dijkstra", "Fibonacci", "Depth First Search"];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -10,6 +14,8 @@ interface HeaderProps {
   session: Session | null;
   /** Opens the auth modal from App — used by Log In button and Sign Out */
   onOpenAuthModal: () => void;
+  activeLanguage?: Language;
+  onSnippetFetch?: (code: string, title: string) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -18,12 +24,47 @@ export default function Header({
   snippetName = "Binary Search",
   session,
   onOpenAuthModal,
+  activeLanguage,
+  onSnippetFetch,
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [bestWpm, setBestWpm] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
+
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [isFetching, setIsFetching] = useState(false);
+  const [suggestions, setSuggestions] = useState(POPULAR_ALGOS);
+
+  const handleSearchSubmit = async (query: string) => {
+    if (!query.trim() || !activeLanguage || !onSnippetFetch) return;
+    setIsFetching(true);
+    try {
+      const result = await getOrFetchSnippet(query, activeLanguage);
+      onSnippetFetch(result.code, result.title);
+      setIsSearching(false);
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation(); // CRITICAL FIX: Prevent typing test from stealing keystrokes
+    
+    if (e.key === 'Escape') {
+      setIsSearching(false);
+      return;
+    }
+    
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      await handleSearchSubmit(searchInput);
+    }
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -96,12 +137,64 @@ export default function Header({
       </div>
 
       {/* ── Center Column: Snippet Title (desktop only) ───────────────── */}
-      <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex justify-center">
-        <div className="bg-white/5 border border-white/10 px-4 py-1.5 rounded-full backdrop-blur-md">
-          <span className="text-sm font-medium text-on-surface-variant">
-            {snippetName}
-          </span>
-        </div>
+      <div className="absolute left-1/2 -translate-x-1/2 hidden md:flex justify-center min-w-[200px]">
+        {!isSearching ? (
+          <button
+            onClick={() => {
+              setIsSearching(true);
+              setSearchInput("");
+              setSuggestions(POPULAR_ALGOS);
+            }}
+            className="bg-white/5 border border-white/10 px-4 py-1.5 rounded-full backdrop-blur-md hover:bg-white/10 transition-colors focus:outline-none"
+          >
+            <span className="text-sm font-medium text-on-surface-variant">
+              {snippetName}
+            </span>
+          </button>
+        ) : (
+          <div className="relative flex items-center">
+            <input
+              autoFocus
+              type="text"
+              value={searchInput}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSearchInput(val);
+                setSuggestions(
+                  val ? POPULAR_ALGOS.filter((algo) => algo.toLowerCase().includes(val.toLowerCase())) : POPULAR_ALGOS
+                );
+              }}
+              onBlur={() => setIsSearching(false)}
+              onKeyDown={handleKeyDown}
+              disabled={isFetching}
+              placeholder={isFetching ? "Loading..." : "Search GitHub snippets..."}
+              className={`bg-white/5 border border-white/10 px-4 py-1.5 rounded-full backdrop-blur-md text-sm text-on-surface outline-none w-64 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-on-surface-variant/50 ${isFetching ? "pr-24" : ""}`}
+            />
+            {isFetching && (
+              <span className="absolute right-4 text-xs text-on-surface-variant/70 animate-pulse">
+                Loading...
+              </span>
+            )}
+            {isSearching && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 w-full bg-white/5 backdrop-blur-md border border-white/10 z-50 max-h-60 overflow-y-auto rounded-xl mt-2 py-2 shadow-2xl">
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    className="w-full text-left px-4 py-2 text-sm text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-colors focus:outline-none"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setSearchInput(suggestion);
+                      setIsSearching(false);
+                      handleSearchSubmit(suggestion);
+                    }}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Right Column: Stats + Profile ─────────────────────────────── */}

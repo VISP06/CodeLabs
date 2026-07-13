@@ -39,16 +39,25 @@ export async function fetchSnippetFromGitHub(
 
   // 1. Search for the file matching the query within the specific repository
   // We filter by extension to avoid pulling documentation files or markdown files
-  const searchQuery = encodeURIComponent(`${query} extension:${extension} repo:${repo}`);
+const searchQuery = encodeURIComponent(`${query} extension:${extension} repo:${repo}`);
   const searchUrl = `https://api.github.com/search/code?q=${searchQuery}`;
 
-  const searchResponse = await fetch(searchUrl, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      // Optional: If you hit rate limits during testing, add a GitHub PAT to your .env file:
-      // Authorization: process.env.REACT_APP_GITHUB_TOKEN ? `Bearer ${process.env.REACT_APP_GITHUB_TOKEN}` : ''
-    }
-  });
+  // 1. Properly fetch the token using Vite's env syntax
+  const token = import.meta.env.VITE_GITHUB_TOKEN;
+  
+  // 2. Build the headers securely
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+  };
+
+  // 3. Only attach the Authorization header if the token actually exists
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    console.warn("No GitHub token found! Search API requires authentication.");
+  }
+
+  const searchResponse = await fetch(searchUrl, { headers });
 
   if (!searchResponse.ok) {
     if (searchResponse.status === 403) {
