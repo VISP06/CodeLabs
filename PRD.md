@@ -48,6 +48,5 @@ The application operates in a distraction-free, IDE-like dark mode environment o
 * **Security Constraint:** Enable Supabase Row Level Security (RLS) policies across performance ledger tables to ensure users can exclusively execute write/update operations matching their verified user authentication UID. This prevents client-side leaderboard manipulation.
 
 ## 5. Excluded Scope (Post-MVP)
-* Vim Keybindings.
 * Custom external repository ingestion via GitHub API.
 * Global live multiplayer matching.
