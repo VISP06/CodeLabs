@@ -57,11 +57,10 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
   const [liveTime, setLiveTime] = useState(0);
   const [isStarted, setIsStarted] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [errorCount, setErrorCount] = useState(0);
 
   /** Timestamp (ms) of the very first keystroke */
   const startTimeRef = useRef<number | null>(null);
-  /** Total attempted keystrokes (for accuracy denominator) */
-  const totalAttemptsRef = useRef(0);
   /** Total correct keystrokes so far */
   const correctCharsRef = useRef(0);
 
@@ -100,8 +99,8 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
     setLiveTime(0);
     setIsStarted(false);
     setIsCompleted(false);
+    setErrorCount(0);
     startTimeRef.current = null;
-    totalAttemptsRef.current = 0;
     correctCharsRef.current = 0;
     autoSkipCountRef.current = 0;
   }, [activeLanguage]);
@@ -109,7 +108,7 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
   // ── Stats updater ──────────────────────────────────────────────────────────
 
   const updateStats = useCallback(
-    (correctCount: number, totalAttempts: number) => {
+    (correctCount: number, currentErrorCount: number) => {
       const now = Date.now();
       const elapsedMs = startTimeRef.current ? now - startTimeRef.current : 0;
       const elapsedMinutes = elapsedMs / 60_000;
@@ -122,11 +121,9 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
           : 0;
       const newWpm = Math.round(rawWpm);
 
-      // Accuracy: ratio of correct keystrokes to total keystrokes attempted.
-      // Clamp strictly to [0, 100] — auto-inserts must never push this above 100.
-      const rawAccuracy =
-        totalAttempts > 0 ? (correctCount / totalAttempts) * 100 : 100;
-      const newAccuracy = Math.min(100, Math.max(0, Math.round(rawAccuracy)));
+      // Accuracy: based on correct keystrokes and cumulative error count
+      const totalAttempts = correctCount + currentErrorCount;
+      const newAccuracy = totalAttempts > 0 ? Math.floor((correctCount / totalAttempts) * 100) : 100;
 
       setWpm(newWpm);
       setAccuracy(newAccuracy);
@@ -185,14 +182,13 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
           setIsStarted(true);
         }
 
-        // Credit every auto-inserted char as 1 attempt + 1 correct
-        totalAttemptsRef.current += 1;
+        // Credit every auto-inserted char as 1 correct
         correctCharsRef.current += inserted.length;
 
         const nextInput = userInput + inserted;
         setUserInput(nextInput);
         setErrorIndex(-1);
-        updateStats(correctCharsRef.current, totalAttemptsRef.current);
+        updateStats(correctCharsRef.current, errorCount);
 
         if (nextInput.length === targetText.length) {
           setIsCompleted(true);
@@ -232,14 +228,13 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
           setIsStarted(true);
         }
 
-        // Credit every auto-inserted char as 1 attempt + 1 correct
-        totalAttemptsRef.current += 1;
+        // Credit every auto-inserted char as 1 correct
         correctCharsRef.current += inserted.length;
 
         const nextInput = userInput + inserted;
         setUserInput(nextInput);
         setErrorIndex(-1);
-        updateStats(correctCharsRef.current, totalAttemptsRef.current);
+        updateStats(correctCharsRef.current, errorCount);
 
         if (nextInput.length === targetText.length) {
           setIsCompleted(true);
@@ -278,7 +273,7 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
           // Recalculate correct chars
           const newCorrect = countCorrect(next, targetText);
           correctCharsRef.current = newCorrect;
-          updateStats(newCorrect, totalAttemptsRef.current);
+          updateStats(newCorrect, errorCount);
 
           return next;
         });
@@ -326,16 +321,14 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
             const autoAppend = typedChar + closingChar;
 
             // ACCURACY FIX: Count only the opening bracket the user physically
-            // typed (1 attempt, 1 correct). The ghost closing char is free —
-            // crediting 2 corrects for 1 attempt pushes accuracy above 100%.
-            totalAttemptsRef.current += 1;
+            // typed (1 correct). The ghost closing char is free.
             correctCharsRef.current += 1;
             autoSkipCountRef.current += 1; // track one ghost closing char
 
             const nextInput = userInput + autoAppend;
             setUserInput(nextInput);
             setErrorIndex(-1);
-            updateStats(correctCharsRef.current, totalAttemptsRef.current);
+            updateStats(correctCharsRef.current, errorCount);
 
             if (nextInput.length === targetText.length) {
               setIsCompleted(true);
@@ -350,13 +343,12 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
         }
 
         // ── Normal correct keystroke ──────────────────────────────────────────
-        totalAttemptsRef.current += 1;
         correctCharsRef.current += 1;
 
         const nextInput = userInput + typedChar;
         setUserInput(nextInput);
         setErrorIndex(-1);
-        updateStats(correctCharsRef.current, totalAttemptsRef.current);
+        updateStats(correctCharsRef.current, errorCount);
 
         if (nextInput.length === targetText.length) {
           setIsCompleted(true);
@@ -368,14 +360,15 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
         }
       } else {
         // ── Incorrect keystroke ───────────────────────────────────────────────
-        totalAttemptsRef.current += 1;
+        const newErrorCount = errorCount + 1;
+        setErrorCount(newErrorCount);
         const nextInput = userInput + typedChar;
         setUserInput(nextInput);
         setErrorIndex(currentIdx);
-        updateStats(correctCharsRef.current, totalAttemptsRef.current);
+        updateStats(correctCharsRef.current, newErrorCount);
       }
     },
-    [userInput, errorIndex, isStarted, isCompleted, targetText, updateStats]
+    [userInput, errorCount, errorIndex, isStarted, isCompleted, targetText, updateStats]
   );
 
   // ── Mount global listener ──────────────────────────────────────────────────
@@ -396,8 +389,8 @@ export function useTypingEngine(activeLanguage: Language): TypingEngineState {
     setLiveTime(0);
     setIsStarted(false);
     setIsCompleted(false);
+    setErrorCount(0);
     startTimeRef.current = null;
-    totalAttemptsRef.current = 0;
     correctCharsRef.current = 0;
     autoSkipCountRef.current = 0;
     inputRef.current?.focus();
