@@ -5,6 +5,7 @@ import { useTypingEngine } from "./hooks/useTypingEngine";
 import type { Language, SnippetLine } from "./data/snippets";
 import { snippets, buildTargetText } from "./data/snippets";
 import { getOrFetchSnippet } from "./utils/snippetService";
+import Home from "./pages/Home";
 import Header from "./components/Header";
 import MainCanvas from "./components/MainCanvas";
 import ActionFooter from "./components/ActionFooter";
@@ -75,6 +76,9 @@ function AuthModal({ onClose }: { onClose: () => void }) {
 // ── Root application component ────────────────────────────────────────────────
 
 export default function App() {
+  // ── View Router state ────────────────────────────────────────────────────────
+  const [currentView, setCurrentView] = useState<"home" | "canvas">("home");
+
   // ── Supabase auth session ────────────────────────────────────────────────────
   const [session, setSession] = useState<Session | null>(null);
 
@@ -148,18 +152,37 @@ export default function App() {
     restart(); // Reset typing test states
   };
 
+  // Handler for selecting an algorithm from the Home dashboard
+  const handleSelectSnippetFromHome = async (title: string, lang: string) => {
+    const mappedLang = (lang.toLowerCase() === "c++" ? "cpp" : lang.toLowerCase()) as Language;
+    if (snippets[mappedLang]) {
+      setActiveLanguage(mappedLang);
+    }
+    
+    try {
+      const result = await getOrFetchSnippet(title, mappedLang || activeLanguage);
+      setTargetText(result.code);
+      setSnippetTitle(result.title);
+      setSnippetLines([]);
+      restart();
+    } catch (err) {
+      console.error("Failed to load snippet from home dashboard:", err);
+    }
+    setCurrentView("canvas");
+  };
+
   // Suppress the unused-variable lint warning for guestCompletions
   void guestCompletions;
 
   return (
     <div
       className="flex flex-col min-h-screen bg-background text-on-surface"
-      onClick={focusInput}
+      onClick={currentView === "canvas" ? focusInput : undefined}
     >
       {/* Decorative ambient background glows */}
       <AmbientGlows />
 
-      {/* Sticky top header */}
+      {/* Sticky top header (with support to click logo/title to go back home) */}
       <Header
         snippetName={snippetTitle}
         session={session}
@@ -168,30 +191,33 @@ export default function App() {
         onSnippetFetch={handleSnippetFetch}
       />
 
-      {/* Main typing canvas */}
-      <main className="flex-1 flex flex-col items-center justify-center py-8 px-4">
-
-        <MainCanvas
-          targetText={targetText}
-          userInput={userInput}
-          errorIndex={errorIndex}
-          isCompleted={isCompleted}
-          isBlindMode={isBlindMode}
-          onFocus={focusInput}
-          session={session}
-          wpm={wpm}
-          accuracy={accuracy}
-          timeTaken={timeTaken}
-          liveTime={liveTime}
-          snippetTitle={snippetTitle}
-          snippetLines={snippetLines}
-          onGuestComplete={handleGuestComplete}
-          showPaywall={showPaywall}
-          onClosePaywall={() => setShowPaywall(false)}
-          activeLanguage={activeLanguage}
-          setActiveLanguage={setActiveLanguage}
-        />
-      </main>
+      {/* View routing: Home Dashboard vs Typing Canvas */}
+      {currentView === "home" ? (
+        <Home onSelectSnippet={handleSelectSnippetFromHome} />
+      ) : (
+        <main className="flex-1 flex flex-col items-center justify-center py-8 px-4">
+          <MainCanvas
+            targetText={targetText}
+            userInput={userInput}
+            errorIndex={errorIndex}
+            isCompleted={isCompleted}
+            isBlindMode={isBlindMode}
+            onFocus={focusInput}
+            session={session}
+            wpm={wpm}
+            accuracy={accuracy}
+            timeTaken={timeTaken}
+            liveTime={liveTime}
+            snippetTitle={snippetTitle}
+            snippetLines={snippetLines}
+            onGuestComplete={handleGuestComplete}
+            showPaywall={showPaywall}
+            onClosePaywall={() => setShowPaywall(false)}
+            activeLanguage={activeLanguage}
+            setActiveLanguage={setActiveLanguage}
+          />
+        </main>
+      )}
 
       {/* Fixed bottom action bar */}
       <ActionFooter
