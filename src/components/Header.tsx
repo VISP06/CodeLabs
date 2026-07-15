@@ -16,6 +16,7 @@ interface HeaderProps {
   onOpenAuthModal: () => void;
   activeLanguage?: Language;
   onSnippetFetch?: (code: string, title: string) => void;
+  onGoHome?: () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -26,6 +27,7 @@ export default function Header({
   onOpenAuthModal,
   activeLanguage,
   onSnippetFetch,
+  onGoHome,
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -130,7 +132,7 @@ export default function Header({
 
       {/* ── Left Column: Brand ─────────────────────────────────────────── */}
       <div className="flex items-center justify-start">
-        <div className="flex items-center gap-2 text-primary hover:opacity-80 transition-all cursor-pointer shrink-0">
+        <div onClick={onGoHome} className="flex items-center gap-2 text-primary hover:opacity-80 transition-all cursor-pointer shrink-0">
           <span className="material-symbols-outlined text-3xl font-bold">terminal</span>
           <span className="text-xl font-bold tracking-tight">&gt;_ CodeLabs</span>
         </div>

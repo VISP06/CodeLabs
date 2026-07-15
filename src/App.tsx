@@ -182,50 +182,53 @@ export default function App() {
       {/* Decorative ambient background glows */}
       <AmbientGlows />
 
-      {/* Sticky top header (with support to click logo/title to go back home) */}
-      <Header
-        snippetName={snippetTitle}
-        session={session}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-        activeLanguage={activeLanguage}
-        onSnippetFetch={handleSnippetFetch}
-      />
-
       {/* View routing: Home Dashboard vs Typing Canvas */}
       {currentView === "home" ? (
         <Home onSelectSnippet={handleSelectSnippetFromHome} />
       ) : (
-        <main className="flex-1 flex flex-col items-center justify-center py-8 px-4">
-          <MainCanvas
-            targetText={targetText}
-            userInput={userInput}
-            errorIndex={errorIndex}
-            isCompleted={isCompleted}
-            isBlindMode={isBlindMode}
-            onFocus={focusInput}
+        <>
+          {/* Sticky top header (with support to click logo/title to go back home) */}
+          <Header
+            snippetName={snippetTitle}
             session={session}
-            wpm={wpm}
-            accuracy={accuracy}
-            timeTaken={timeTaken}
-            liveTime={liveTime}
-            snippetTitle={snippetTitle}
-            snippetLines={snippetLines}
-            onGuestComplete={handleGuestComplete}
-            showPaywall={showPaywall}
-            onClosePaywall={() => setShowPaywall(false)}
+            onOpenAuthModal={() => setIsAuthModalOpen(true)}
             activeLanguage={activeLanguage}
-            setActiveLanguage={setActiveLanguage}
+            onSnippetFetch={handleSnippetFetch}
+            onGoHome={() => setCurrentView("home")}
           />
-        </main>
-      )}
 
-      {/* Fixed bottom action bar */}
-      <ActionFooter
-        onRestart={restart}
-        isBlindMode={isBlindMode}
-        onToggleBlindMode={() => setIsBlindMode((v) => !v)}
-        onOpenLeaderboard={() => setShowLeaderboard(true)}
-      />
+          <main className="flex-1 flex flex-col items-center justify-center py-8 px-4">
+            <MainCanvas
+              targetText={targetText}
+              userInput={userInput}
+              errorIndex={errorIndex}
+              isCompleted={isCompleted}
+              isBlindMode={isBlindMode}
+              onFocus={focusInput}
+              session={session}
+              wpm={wpm}
+              accuracy={accuracy}
+              timeTaken={timeTaken}
+              liveTime={liveTime}
+              snippetTitle={snippetTitle}
+              snippetLines={snippetLines}
+              onGuestComplete={handleGuestComplete}
+              showPaywall={showPaywall}
+              onClosePaywall={() => setShowPaywall(false)}
+              activeLanguage={activeLanguage}
+              setActiveLanguage={setActiveLanguage}
+            />
+          </main>
+
+          {/* Fixed bottom action bar */}
+          <ActionFooter
+            onRestart={restart}
+            isBlindMode={isBlindMode}
+            onToggleBlindMode={() => setIsBlindMode((v) => !v)}
+            onOpenLeaderboard={() => setShowLeaderboard(true)}
+          />
+        </>
+      )}
 
       {/* Auth modal — opened via Header "Log In" button */}
       {isAuthModalOpen && (
